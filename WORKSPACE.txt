@@ -1,0 +1,4138 @@
+  03:13:53.575  > local service = game.Workspace
+
+print("!!! STARTING SERVERSTORAGE SCRAPE !!!")
+
+local function scan(parent)
+    for _, item in ipairs(parent:GetDescendants()) do
+        -- We look for Scripts and ModuleScripts
+        if item:IsA("LuaSourceContainer") then 
+            print("------------------------------------------")
+            print("PATH: " .. item:GetFullName())
+            print("TYPE: " .. item.ClassName)
+            print("------------------------------------------")
+            print(item.Source)
+            print("\n-- END OF SCRIPT --\n")
+        end
+    end
+end
+
+scan(service)
+print("!!! SCRAPE COMPLETE !!!")  -  Studio
+  03:13:53.576  !!! STARTING SERVERSTORAGE SCRAPE !!!  -  Editar
+  03:13:53.576  ------------------------------------------  -  Editar
+  03:13:53.576  PATH: Workspace.Ignored.FirePit.Script  -  Editar
+  03:13:53.577  TYPE: Script  -  Editar
+  03:13:53.577  ------------------------------------------  -  Editar
+  03:13:53.577  local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+local Debris = game:GetService("Debris")
+
+local Storage = ReplicatedStorage:WaitForChild("Storage")
+
+local firePit = script.Parent
+
+local overlapParams = OverlapParams.new()
+overlapParams.FilterDescendantsInstances = {workspace.Ignored, workspace.Buildings}
+overlapParams.CollisionGroup = "Raycast"
+
+local function getRandomChild(parent)
+	return parent:GetChildren()[math.random(#parent:GetChildren())]
+end
+
+local function isHumanoid(part)
+	if part.Parent:FindFirstChild("Humanoid") then
+		return part.Parent
+	elseif part.Parent ~= workspace then
+		return isHumanoid(part.Parent)
+	end
+
+	return false
+end
+
+while true do
+	local hitted = {}
+	local collideParts = workspace:GetPartBoundsInBox(firePit.Hitbox.CFrame, firePit.Hitbox.Size, overlapParams)
+	for _,part in pairs(collideParts) do
+		if part:IsDescendantOf(workspace.Characters) and part.Name ~= "HumanoidRootPart" then
+			local target = isHumanoid(part)
+			if target and not hitted[target] and not target:FindFirstChildWhichIsA("ForceField") then
+				hitted[target] = true
+				
+				target.Humanoid:SetAttribute("BurnHit", true)
+				target.Humanoid:SetAttribute("BurnCount", target.Humanoid:GetAttribute("BurnCount") + 1)
+				if target.Humanoid:GetAttribute("BurnCount") <= 1 then
+					task.spawn(function()
+						while target:IsDescendantOf(workspace) and target.Humanoid:GetAttribute("BurnCount") >= 1 do
+							task.wait(1.5)
+							if target:IsDescendantOf(workspace) and target:FindFirstChild("Humanoid") then
+								local n = target.Humanoid:GetAttribute("BurnCount") - 1
+								target.Humanoid:SetAttribute("BurnCount", math.max(n, 0))
+							end
+						end
+					end)
+				end
+				local lastBurnCount = target.Humanoid:GetAttribute("BurnCount")
+				task.delay(1, function()
+					if target:IsDescendantOf(workspace) and (target.Humanoid:GetAttribute("BurnCount") < lastBurnCount or target.Humanoid:GetAttribute("BurnCount") <= 0) then
+						target.Humanoid:SetAttribute("BurnHit", false)
+					end
+				end)
+				target.Humanoid:TakeDamage(5)
+				if target.Humanoid.Health > 0 and not target.Humanoid:GetAttribute("Burning") and target:FindFirstChild("Head") then
+					local hurt = _G.createSound(getRandomChild(Storage.Sounds.light_hurt), target.Head)
+					hurt.Name = "hurt"
+					hurt:Play()
+				end
+				if target.Humanoid:GetAttribute("BurnCount") >= 5 then
+					task.defer(function() _G.burn(target, 3, target.Humanoid:GetAttribute("Burning") and 0 or 5, 0.1) end)
+				end
+			end
+		end
+	end
+
+	table.clear(hitted)
+	hitted = nil
+
+	task.wait(math.random(40, 60) / 100)
+end  -  Editar
+  03:13:53.577  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.577  ------------------------------------------  -  Editar
+  03:13:53.577  PATH: Workspace.Ignored.Blender.Script  -  Editar
+  03:13:53.577  TYPE: Script  -  Editar
+  03:13:53.577  ------------------------------------------  -  Editar
+  03:13:53.577  local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+local Debris = game:GetService("Debris")
+
+local Storage = ReplicatedStorage:WaitForChild("Storage")
+local StorageServer = ServerStorage:WaitForChild("Storage")
+
+local Network = require(Storage.Modules.Network)
+local Ragdoll = require(StorageServer.Modules.Ragdoll)
+
+local blender = script.Parent
+local blades = blender:WaitForChild("Blades")
+blades:SetNetworkOwner(nil)
+
+local overlapParams = OverlapParams.new()
+overlapParams.FilterDescendantsInstances = {workspace.Ignored, workspace.Buildings}
+overlapParams.CollisionGroup = "Raycast"
+
+local function getRandomChild(parent)
+	return parent:GetChildren()[math.random(#parent:GetChildren())]
+end
+
+local function isHumanoid(part)
+	if part.Parent:FindFirstChild("Humanoid") then
+		return part.Parent
+	elseif part.Parent ~= workspace then
+		return isHumanoid(part.Parent)
+	end
+
+	return false
+end
+
+local function emitParticle(name, multiplier, v, dur)
+	local n = Storage.Particles[name].Attachment:Clone()
+	if typeof(v) == "Vector3" then
+		n.Parent = workspace.Terrain
+		n.WorldPosition = v
+	else
+		n.Parent = v
+	end
+	for _,p in pairs(n:GetChildren()) do
+		p:Emit(p:GetAttribute("EmitCount") * (multiplier or 1))
+	end
+	Debris:AddItem(n, dur, 3)
+
+	return n
+end
+
+while true do
+	local hitted = {}
+	local collideParts = workspace:GetPartBoundsInBox(blades.CFrame, blades.Size, overlapParams)
+	for _,part in pairs(collideParts) do
+		if part:IsDescendantOf(workspace.Characters) and part.Name ~= "HumanoidRootPart" then
+			local target = isHumanoid(part)
+			if target and not hitted[target] and not target:FindFirstChildWhichIsA("ForceField") then
+				hitted[target] = true
+
+				task.defer(function()
+					local params = RaycastParams.new()
+					params.FilterDescendantsInstances = {target}
+					params.CollisionGroup = "Raycast"
+					params.FilterType = Enum.RaycastFilterType.Whitelist
+
+					local damage = 60
+					local lastHealth = target.Humanoid.Health
+					local dead = false
+					if part:GetAttribute("Enabled") then
+						target.Humanoid:TakeDamage(damage)
+					end
+					if target.Humanoid.Health <= 0 and lastHealth > 0 then
+						dead = true
+					end
+					local origin = part.Position + (part.Velocity * -1)
+					local dir = part.Velocity * 2
+					local cast = workspace:Raycast(origin, dir, params)
+					if cast and target:FindFirstChild("Head") then
+						local gib,_ = _G.getGibFromPosition(part, cast.Position)
+						Network:FireAllClients("client", "gore", target, part, damage, gib, dir, cast.Position, target.Head.CFrame.LookVector, cast.Normal, dead)
+					end
+					
+					target.Humanoid:SetAttribute("RagdollDur", 1)
+					target.Humanoid:SetAttribute("Ragdoll", true)
+					local force = Instance.new("BodyVelocity")
+					force.MaxForce = Vector3.new(1e11, 1e11, 1e11)
+					force.Velocity = (part.CFrame.UpVector * math.random(30, 50) * part:GetMass()) * ((part.Name == "Torso" or part.Name == "HumanoidRootPart") and 0.5 or 1)
+					force.Parent = part
+					Debris:AddItem(force, 0.1)
+					part.RotVelocity = part.Velocity
+					if part:GetAttribute("Enabled") then
+						target.Humanoid.RootPart.Velocity = part.Velocity
+					end
+
+					task.defer(function()
+						local constraint = part:FindFirstChild("Socket")
+						if constraint and constraint:IsA("BallSocketConstraint") then
+							part:SetAttribute("Enabled", false)
+							local ats = {constraint.Attachment0, constraint.Attachment1}
+							for _,v in pairs(ats) do
+								emitParticle("BloodHitEffect", nil, part.Position)
+								_G.createSound(getRandomChild(Storage.Sounds.fleshHits), part):Play()
+							end
+						end
+					end)
+					
+					if target:FindFirstChild("Head") and not target.Head:FindFirstChild("scream_blender") then
+						local n = Instance.new("StringValue")
+						n.Name = "scream_blender"
+						n.Parent = target.Head
+						
+						Network:FireAllClients("client", "createSound", Storage.Sounds.femur_breaker, target.Head)
+					end
+					Network:FireAllClients("client", "createSound", Storage.Sounds.blade_slice, blender.Base)
+					local slice = _G.createSound(Storage.Sounds.blade_slice, part)
+					slice.PlaybackSpeed += math.random() * 0.3
+					slice:Play()
+					
+					Network:FireAllClients("client", "createSound", getRandomChild(Storage.Sounds.blades), target.Humanoid.RootPart)
+				end)
+			end
+		end
+	end
+	
+	table.clear(hitted)
+	hitted = nil
+	
+	task.wait(math.random(15, 30) / 100)
+end  -  Editar
+  03:13:53.577  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.577  ------------------------------------------  -  Editar
+  03:13:53.577  PATH: Workspace.Buildings.Objects.Barrel.Core  -  Editar
+  03:13:53.577  TYPE: Script  -  Editar
+  03:13:53.577  ------------------------------------------  -  Editar
+  03:13:53.578  require(game.ServerStorage:WaitForChild("Storage"):WaitForChild("Modules"):WaitForChild("Objects"):WaitForChild("Barrel"))(script)  -  Editar
+  03:13:53.578  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.578  ------------------------------------------  -  Editar
+  03:13:53.578  PATH: Workspace.Buildings.Objects.Barrel.Core  -  Editar
+  03:13:53.578  TYPE: Script  -  Editar
+  03:13:53.578  ------------------------------------------  -  Editar
+  03:13:53.578  require(game.ServerStorage:WaitForChild("Storage"):WaitForChild("Modules"):WaitForChild("Objects"):WaitForChild("Barrel"))(script)  -  Editar
+  03:13:53.578  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.578  ------------------------------------------  -  Editar
+  03:13:53.578  PATH: Workspace.Buildings.Objects.Barrel.Core  -  Editar
+  03:13:53.578  TYPE: Script  -  Editar
+  03:13:53.578  ------------------------------------------  -  Editar
+  03:13:53.578  require(game.ServerStorage:WaitForChild("Storage"):WaitForChild("Modules"):WaitForChild("Objects"):WaitForChild("Barrel"))(script)  -  Editar
+  03:13:53.578  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.579  ------------------------------------------  -  Editar
+  03:13:53.579  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.ProximityPrompt.Script  -  Editar
+  03:13:53.579  TYPE: Script  -  Editar
+  03:13:53.579  ------------------------------------------  -  Editar
+  03:13:53.579  script.Parent.Triggered:Connect(function(player)	
+
+	local randomtool = math.random(1,4) -- 1,3 (3 is how many tools you have)
+	script.Parent.Enabled = false
+	script.Parent.Parent.Transparency = 0
+	script.Parent.Parent.CanCollide = true
+	script.Parent.Parent.Anchored = true
+	if randomtool == 1 then
+		local tool1 = game.ServerStorage["SM4A1"]:Clone()
+		
+		tool1.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 2 then
+		local tool2 = game.ServerStorage["SCAR"]:Clone()
+
+		tool2.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 3 then
+		local tool3 = game.ServerStorage["FN-FAL"]:Clone()
+
+		tool3.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 4 then
+		local tool4 = game.ServerStorage["AT-4"]:Clone()
+
+		tool4.Parent = player.Backpack -- sends tool to players backpack.
+	end
+end)
+
+while wait() do
+	if script.Parent.Parent.Transparency == 0 then
+		wait(1)
+		
+		wait(200) -- Change this to set respawn cooldown.
+		
+		wait(1)
+		
+		script.Parent.Parent.Transparency = 0 
+		script.Parent.Parent.CanCollide = true
+		script.Parent.Enabled = true
+	end
+end  -  Editar
+  03:13:53.579  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.579  ------------------------------------------  -  Editar
+  03:13:53.579  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.Script  -  Editar
+  03:13:53.579  TYPE: Script  -  Editar
+  03:13:53.579  ------------------------------------------  -  Editar
+  03:13:53.579  
+local prompt = script.Parent.ProximityPrompt
+local anim = script.Parent.Animation
+
+local function snd() --this function is for playing a sound once you get the item
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://526686369" --place the id of your sound
+	sound.MaxDistance = 25 --how far do you want the sound to be heard
+	sound.Parent = script.Parent
+	sound.Volume = 0.35 --how loud the sound should be
+	sound:play() --play the sound :)
+end
+
+prompt.Triggered:Connect(function(player)
+	local hum = player.Character:WaitForChild("Humanoid")
+	local loadAnim = hum.Animator:LoadAnimation(anim)
+	loadAnim:play() 
+end)  -  Editar
+  03:13:53.579  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.579  ------------------------------------------  -  Editar
+  03:13:53.580  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.ProximityPrompt.Script  -  Editar
+  03:13:53.580  TYPE: Script  -  Editar
+  03:13:53.580  ------------------------------------------  -  Editar
+  03:13:53.580  script.Parent.Triggered:Connect(function(player)	
+
+	local randomtool = math.random(1,4) -- 1,3 (3 is how many tools you have)
+	script.Parent.Enabled = false
+	script.Parent.Parent.Transparency = 0
+	script.Parent.Parent.CanCollide = true
+	script.Parent.Parent.Anchored = true
+	if randomtool == 1 then
+		local tool1 = game.ServerStorage["SM4A1"]:Clone()
+		
+		tool1.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 2 then
+		local tool2 = game.ServerStorage["SCAR"]:Clone()
+
+		tool2.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 3 then
+		local tool3 = game.ServerStorage["FN-FAL"]:Clone()
+
+		tool3.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 4 then
+		local tool4 = game.ServerStorage["AT-4"]:Clone()
+
+		tool4.Parent = player.Backpack -- sends tool to players backpack.
+	end
+end)
+
+while wait() do
+	if script.Parent.Parent.Transparency == 0 then
+		wait(1)
+		
+		wait(200) -- Change this to set respawn cooldown.
+		
+		wait(1)
+		
+		script.Parent.Parent.Transparency = 0 
+		script.Parent.Parent.CanCollide = true
+		script.Parent.Enabled = true
+	end
+end  -  Editar
+  03:13:53.580  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.580  ------------------------------------------  -  Editar
+  03:13:53.580  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.Script  -  Editar
+  03:13:53.580  TYPE: Script  -  Editar
+  03:13:53.580  ------------------------------------------  -  Editar
+  03:13:53.580  
+local prompt = script.Parent.ProximityPrompt
+local anim = script.Parent.Animation
+
+local function snd() --this function is for playing a sound once you get the item
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://526686369" --place the id of your sound
+	sound.MaxDistance = 25 --how far do you want the sound to be heard
+	sound.Parent = script.Parent
+	sound.Volume = 0.35 --how loud the sound should be
+	sound:play() --play the sound :)
+end
+
+prompt.Triggered:Connect(function(player)
+	local hum = player.Character:WaitForChild("Humanoid")
+	local loadAnim = hum.Animator:LoadAnimation(anim)
+	loadAnim:play() 
+end)  -  Editar
+  03:13:53.580  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.580  ------------------------------------------  -  Editar
+  03:13:53.580  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.ProximityPrompt.Script  -  Editar
+  03:13:53.580  TYPE: Script  -  Editar
+  03:13:53.581  ------------------------------------------  -  Editar
+  03:13:53.581  script.Parent.Triggered:Connect(function(player)	
+
+	local randomtool = math.random(1,4) -- 1,3 (3 is how many tools you have)
+	script.Parent.Enabled = false
+	script.Parent.Parent.Transparency = 0
+	script.Parent.Parent.CanCollide = true
+	script.Parent.Parent.Anchored = true
+	if randomtool == 1 then
+		local tool1 = game.ServerStorage["SM4A1"]:Clone()
+		
+		tool1.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 2 then
+		local tool2 = game.ServerStorage["SCAR"]:Clone()
+
+		tool2.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 3 then
+		local tool3 = game.ServerStorage["FN-FAL"]:Clone()
+
+		tool3.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 4 then
+		local tool4 = game.ServerStorage["AT-4"]:Clone()
+
+		tool4.Parent = player.Backpack -- sends tool to players backpack.
+	end
+end)
+
+while wait() do
+	if script.Parent.Parent.Transparency == 0 then
+		wait(1)
+		
+		wait(200) -- Change this to set respawn cooldown.
+		
+		wait(1)
+		
+		script.Parent.Parent.Transparency = 0 
+		script.Parent.Parent.CanCollide = true
+		script.Parent.Enabled = true
+	end
+end  -  Editar
+  03:13:53.581  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.581  ------------------------------------------  -  Editar
+  03:13:53.581  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.Script  -  Editar
+  03:13:53.581  TYPE: Script  -  Editar
+  03:13:53.581  ------------------------------------------  -  Editar
+  03:13:53.581  
+local prompt = script.Parent.ProximityPrompt
+local anim = script.Parent.Animation
+
+local function snd() --this function is for playing a sound once you get the item
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://526686369" --place the id of your sound
+	sound.MaxDistance = 25 --how far do you want the sound to be heard
+	sound.Parent = script.Parent
+	sound.Volume = 0.35 --how loud the sound should be
+	sound:play() --play the sound :)
+end
+
+prompt.Triggered:Connect(function(player)
+	local hum = player.Character:WaitForChild("Humanoid")
+	local loadAnim = hum.Animator:LoadAnimation(anim)
+	loadAnim:play() 
+end)  -  Editar
+  03:13:53.581  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.581  ------------------------------------------  -  Editar
+  03:13:53.581  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.ProximityPrompt.Script  -  Editar
+  03:13:53.581  TYPE: Script  -  Editar
+  03:13:53.581  ------------------------------------------  -  Editar
+  03:13:53.581  script.Parent.Triggered:Connect(function(player)	
+
+	local randomtool = math.random(1,4) -- 1,3 (3 is how many tools you have)
+	script.Parent.Enabled = false
+	script.Parent.Parent.Transparency = 0
+	script.Parent.Parent.CanCollide = true
+	script.Parent.Parent.Anchored = true
+	if randomtool == 1 then
+		local tool1 = game.ServerStorage["SM4A1"]:Clone()
+		
+		tool1.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 2 then
+		local tool2 = game.ServerStorage["SCAR"]:Clone()
+
+		tool2.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 3 then
+		local tool3 = game.ServerStorage["FN-FAL"]:Clone()
+
+		tool3.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 4 then
+		local tool4 = game.ServerStorage["AT-4"]:Clone()
+
+		tool4.Parent = player.Backpack -- sends tool to players backpack.
+	end
+end)
+
+while wait() do
+	if script.Parent.Parent.Transparency == 0 then
+		wait(1)
+		
+		wait(200) -- Change this to set respawn cooldown.
+		
+		wait(1)
+		
+		script.Parent.Parent.Transparency = 0 
+		script.Parent.Parent.CanCollide = true
+		script.Parent.Enabled = true
+	end
+end  -  Editar
+  03:13:53.581  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.582  ------------------------------------------  -  Editar
+  03:13:53.582  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.Script  -  Editar
+  03:13:53.582  TYPE: Script  -  Editar
+  03:13:53.582  ------------------------------------------  -  Editar
+  03:13:53.582  
+local prompt = script.Parent.ProximityPrompt
+local anim = script.Parent.Animation
+
+local function snd() --this function is for playing a sound once you get the item
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://526686369" --place the id of your sound
+	sound.MaxDistance = 25 --how far do you want the sound to be heard
+	sound.Parent = script.Parent
+	sound.Volume = 0.35 --how loud the sound should be
+	sound:play() --play the sound :)
+end
+
+prompt.Triggered:Connect(function(player)
+	local hum = player.Character:WaitForChild("Humanoid")
+	local loadAnim = hum.Animator:LoadAnimation(anim)
+	loadAnim:play() 
+end)  -  Editar
+  03:13:53.582  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.582  ------------------------------------------  -  Editar
+  03:13:53.582  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.ProximityPrompt.Script  -  Editar
+  03:13:53.582  TYPE: Script  -  Editar
+  03:13:53.582  ------------------------------------------  -  Editar
+  03:13:53.582  script.Parent.Triggered:Connect(function(player)	
+
+	local randomtool = math.random(1,4) -- 1,3 (3 is how many tools you have)
+	script.Parent.Enabled = false
+	script.Parent.Parent.Transparency = 0
+	script.Parent.Parent.CanCollide = true
+	script.Parent.Parent.Anchored = true
+	if randomtool == 1 then
+		local tool1 = game.ServerStorage["SM4A1"]:Clone()
+		
+		tool1.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 2 then
+		local tool2 = game.ServerStorage["SCAR"]:Clone()
+
+		tool2.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 3 then
+		local tool3 = game.ServerStorage["FN-FAL"]:Clone()
+
+		tool3.Parent = player.Backpack -- sends tool to players backpack.
+	elseif randomtool == 4 then
+		local tool4 = game.ServerStorage["AT-4"]:Clone()
+
+		tool4.Parent = player.Backpack -- sends tool to players backpack.
+	end
+end)
+
+while wait() do
+	if script.Parent.Parent.Transparency == 0 then
+		wait(1)
+		
+		wait(200) -- Change this to set respawn cooldown.
+		
+		wait(1)
+		
+		script.Parent.Parent.Transparency = 0 
+		script.Parent.Parent.CanCollide = true
+		script.Parent.Enabled = true
+	end
+end  -  Editar
+  03:13:53.582  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.582  ------------------------------------------  -  Editar
+  03:13:53.582  PATH: Workspace.Buildings.Loot.Weaponry.Military Container.Script  -  Editar
+  03:13:53.583  TYPE: Script  -  Editar
+  03:13:53.583  ------------------------------------------  -  Editar
+  03:13:53.583  
+local prompt = script.Parent.ProximityPrompt
+local anim = script.Parent.Animation
+
+local function snd() --this function is for playing a sound once you get the item
+	local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://526686369" --place the id of your sound
+	sound.MaxDistance = 25 --how far do you want the sound to be heard
+	sound.Parent = script.Parent
+	sound.Volume = 0.35 --how loud the sound should be
+	sound:play() --play the sound :)
+end
+
+prompt.Triggered:Connect(function(player)
+	local hum = player.Character:WaitForChild("Humanoid")
+	local loadAnim = hum.Animator:LoadAnimation(anim)
+	loadAnim:play() 
+end)  -  Editar
+  03:13:53.583  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.583  ------------------------------------------  -  Editar
+  03:13:53.583  PATH: Workspace.Characters.NPCs.Market.Animate  -  Editar
+  03:13:53.583  TYPE: Script  -  Editar
+  03:13:53.583  ------------------------------------------  -  Editar
+  03:13:53.583  local Figure = script.Parent
+local Torso = Figure:WaitForChild("Torso")
+local RightShoulder = Torso:WaitForChild("Right Shoulder")
+local LeftShoulder = Torso:WaitForChild("Left Shoulder")
+local RightHip = Torso:WaitForChild("Right Hip")
+local LeftHip = Torso:WaitForChild("Left Hip")
+local Neck = Torso:WaitForChild("Neck")
+local Humanoid = Figure:WaitForChild("Humanoid")
+local pose = "Standing"
+
+
+local userPlayEmoteByIdAnimTrackReturn do
+	local success, value = pcall(function()
+		return UserSettings():IsUserFeatureEnabled("UserPlayEmoteByIdAnimTrackReturn2")
+	end)
+	userPlayEmoteByIdAnimTrackReturn = success and value
+end
+
+local EMOTE_TRANSITION_TIME = 0.1
+
+local currentAnim = ""
+local currentAnimInstance = nil
+local currentAnimTrack = nil
+local currentAnimKeyframeHandler = nil
+local currentAnimSpeed = 1.0
+local animTable = {}
+local animNames = { 
+	idle = 	{	
+		{ id = "http://www.roblox.com/asset/?id=180435571", weight = 9 },
+		{ id = "http://www.roblox.com/asset/?id=180435792", weight = 1 }
+	},
+	walk = 	{ 	
+		{ id = "http://www.roblox.com/asset/?id=180426354", weight = 10 } 
+	}, 
+	run = 	{
+		{ id = "run.xml", weight = 10 } 
+	}, 
+	jump = 	{
+		{ id = "http://www.roblox.com/asset/?id=125750702", weight = 10 } 
+	}, 
+	fall = 	{
+		{ id = "http://www.roblox.com/asset/?id=180436148", weight = 10 } 
+	}, 
+	climb = {
+		{ id = "http://www.roblox.com/asset/?id=180436334", weight = 10 } 
+	}, 
+	sit = 	{
+		{ id = "http://www.roblox.com/asset/?id=178130996", weight = 10 } 
+	},	
+	toolnone = {
+		{ id = "http://www.roblox.com/asset/?id=182393478", weight = 10 } 
+	},
+	toolslash = {
+		{ id = "http://www.roblox.com/asset/?id=129967390", weight = 10 } 
+		--				{ id = "slash.xml", weight = 10 } 
+	},
+	toollunge = {
+		{ id = "http://www.roblox.com/asset/?id=129967478", weight = 10 } 
+	},
+	wave = {
+		{ id = "http://www.roblox.com/asset/?id=128777973", weight = 10 } 
+	},
+	point = {
+		{ id = "http://www.roblox.com/asset/?id=128853357", weight = 10 } 
+	},
+	dance1 = {
+		{ id = "http://www.roblox.com/asset/?id=182435998", weight = 10 }, 
+		{ id = "http://www.roblox.com/asset/?id=182491037", weight = 10 }, 
+		{ id = "http://www.roblox.com/asset/?id=182491065", weight = 10 } 
+	},
+	dance2 = {
+		{ id = "http://www.roblox.com/asset/?id=182436842", weight = 10 }, 
+		{ id = "http://www.roblox.com/asset/?id=182491248", weight = 10 }, 
+		{ id = "http://www.roblox.com/asset/?id=182491277", weight = 10 } 
+	},
+	dance3 = {
+		{ id = "http://www.roblox.com/asset/?id=182436935", weight = 10 }, 
+		{ id = "http://www.roblox.com/asset/?id=182491368", weight = 10 }, 
+		{ id = "http://www.roblox.com/asset/?id=182491423", weight = 10 } 
+	},
+	laugh = {
+		{ id = "http://www.roblox.com/asset/?id=129423131", weight = 10 } 
+	},
+	cheer = {
+		{ id = "http://www.roblox.com/asset/?id=129423030", weight = 10 } 
+	},
+}
+local dances = {"dance1", "dance2", "dance3"}
+
+-- Existance in this list signifies that it is an emote, the value indicates if it is a looping emote
+local emoteNames = { wave = false, point = false, dance1 = true, dance2 = true, dance3 = true, laugh = false, cheer = false}
+
+function configureAnimationSet(name, fileList)
+	if (animTable[name] ~= nil) then
+		for _, connection in pairs(animTable[name].connections) do
+			connection:disconnect()
+		end
+	end
+	animTable[name] = {}
+	animTable[name].count = 0
+	animTable[name].totalWeight = 0	
+	animTable[name].connections = {}
+
+	-- check for config values
+	local config = script:FindFirstChild(name)
+	if (config ~= nil) then
+		--		print("Loading anims " .. name)
+		table.insert(animTable[name].connections, config.ChildAdded:connect(function(child) configureAnimationSet(name, fileList) end))
+		table.insert(animTable[name].connections, config.ChildRemoved:connect(function(child) configureAnimationSet(name, fileList) end))
+		local idx = 1
+		for _, childPart in pairs(config:GetChildren()) do
+			if (childPart:IsA("Animation")) then
+				table.insert(animTable[name].connections, childPart.Changed:connect(function(property) configureAnimationSet(name, fileList) end))
+				animTable[name][idx] = {}
+				animTable[name][idx].anim = childPart
+				local weightObject = childPart:FindFirstChild("Weight")
+				if (weightObject == nil) then
+					animTable[name][idx].weight = 1
+				else
+					animTable[name][idx].weight = weightObject.Value
+				end
+				animTable[name].count = animTable[name].count + 1
+				animTable[name].totalWeight = animTable[name].totalWeight + animTable[name][idx].weight
+				--			print(name .. " [" .. idx .. "] " .. animTable[name][idx].anim.AnimationId .. " (" .. animTable[name][idx].weight .. ")")
+				idx = idx + 1
+			end
+		end
+	end
+
+	-- fallback to defaults
+	if (animTable[name].count <= 0) then
+		for idx, anim in pairs(fileList) do
+			animTable[name][idx] = {}
+			animTable[name][idx].anim = Instance.new("Animation")
+			animTable[name][idx].anim.Name = name
+			animTable[name][idx].anim.AnimationId = anim.id
+			animTable[name][idx].weight = anim.weight
+			animTable[name].count = animTable[name].count + 1
+			animTable[name].totalWeight = animTable[name].totalWeight + anim.weight
+			--			print(name .. " [" .. idx .. "] " .. anim.id .. " (" .. anim.weight .. ")")
+		end
+	end
+end
+
+-- Setup animation objects
+function scriptChildModified(child)
+	local fileList = animNames[child.Name]
+	if (fileList ~= nil) then
+		configureAnimationSet(child.Name, fileList)
+	end	
+end
+
+script.ChildAdded:connect(scriptChildModified)
+script.ChildRemoved:connect(scriptChildModified)
+
+-- Clear any existing animation tracks
+-- Fixes issue with characters that are moved in and out of the Workspace accumulating tracks
+local animator = if Humanoid then Humanoid:FindFirstChildOfClass("Animator") else nil
+if animator then
+	local animTracks = animator:GetPlayingAnimationTracks()
+	for i,track in ipairs(animTracks) do
+		track:Stop(0)
+		track:Destroy()
+	end
+end
+
+
+for name, fileList in pairs(animNames) do 
+	configureAnimationSet(name, fileList)
+end	
+
+-- ANIMATION
+
+-- declarations
+local toolAnim = "None"
+local toolAnimTime = 0
+
+local jumpAnimTime = 0
+local jumpAnimDuration = 0.3
+
+local toolTransitionTime = 0.1
+local fallTransitionTime = 0.3
+local jumpMaxLimbVelocity = 0.75
+
+-- functions
+
+function stopAllAnimations()
+	local oldAnim = currentAnim
+
+	-- return to idle if finishing an emote
+	if (emoteNames[oldAnim] ~= nil and emoteNames[oldAnim] == false) then
+		oldAnim = "idle"
+	end
+
+	currentAnim = ""
+	currentAnimInstance = nil
+	if (currentAnimKeyframeHandler ~= nil) then
+		currentAnimKeyframeHandler:disconnect()
+	end
+
+	if (currentAnimTrack ~= nil) then
+		currentAnimTrack:Stop()
+		currentAnimTrack:Destroy()
+		currentAnimTrack = nil
+	end
+	return oldAnim
+end
+
+function setAnimationSpeed(speed)
+	if speed ~= currentAnimSpeed then
+		currentAnimSpeed = speed
+		currentAnimTrack:AdjustSpeed(currentAnimSpeed)
+	end
+end
+
+function keyFrameReachedFunc(frameName)
+	if (frameName == "End") then
+
+		local repeatAnim = currentAnim
+		-- return to idle if finishing an emote
+		if (emoteNames[repeatAnim] ~= nil and emoteNames[repeatAnim] == false) then
+			repeatAnim = "idle"
+		end
+
+		local animSpeed = currentAnimSpeed
+		playAnimation(repeatAnim, 0.0, Humanoid)
+		setAnimationSpeed(animSpeed)
+	end
+end
+
+-- Preload animations
+function playAnimation(animName, transitionTime, humanoid) 
+
+	local roll = math.random(1, animTable[animName].totalWeight) 
+	local origRoll = roll
+	local idx = 1
+	while (roll > animTable[animName][idx].weight) do
+		roll = roll - animTable[animName][idx].weight
+		idx = idx + 1
+	end
+	--		print(animName .. " " .. idx .. " [" .. origRoll .. "]")
+	local anim = animTable[animName][idx].anim
+
+	-- switch animation		
+	if (anim ~= currentAnimInstance) then
+
+		if (currentAnimTrack ~= nil) then
+			currentAnimTrack:Stop(transitionTime)
+			currentAnimTrack:Destroy()
+		end
+
+		currentAnimSpeed = 1.0
+
+		-- load it to the humanoid; get AnimationTrack
+		currentAnimTrack = humanoid:LoadAnimation(anim)
+		currentAnimTrack.Priority = Enum.AnimationPriority.Core
+
+		-- play the animation
+		currentAnimTrack:Play(transitionTime)
+		currentAnim = animName
+		currentAnimInstance = anim
+
+		-- set up keyframe name triggers
+		if (currentAnimKeyframeHandler ~= nil) then
+			currentAnimKeyframeHandler:disconnect()
+		end
+		currentAnimKeyframeHandler = currentAnimTrack.KeyframeReached:connect(keyFrameReachedFunc)
+
+	end
+
+end
+
+-------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+
+local toolAnimName = ""
+local toolAnimTrack = nil
+local toolAnimInstance = nil
+local currentToolAnimKeyframeHandler = nil
+
+function toolKeyFrameReachedFunc(frameName)
+	if (frameName == "End") then
+		--		print("Keyframe : ".. frameName)	
+		playToolAnimation(toolAnimName, 0.0, Humanoid)
+	end
+end
+
+
+function playToolAnimation(animName, transitionTime, humanoid, priority)	 
+
+	local roll = math.random(1, animTable[animName].totalWeight) 
+	local origRoll = roll
+	local idx = 1
+	while (roll > animTable[animName][idx].weight) do
+		roll = roll - animTable[animName][idx].weight
+		idx = idx + 1
+	end
+	--		print(animName .. " * " .. idx .. " [" .. origRoll .. "]")
+	local anim = animTable[animName][idx].anim
+
+	if (toolAnimInstance ~= anim) then
+
+		if (toolAnimTrack ~= nil) then
+			toolAnimTrack:Stop()
+			toolAnimTrack:Destroy()
+			transitionTime = 0
+		end
+
+		-- load it to the humanoid; get AnimationTrack
+		toolAnimTrack = humanoid:LoadAnimation(anim)
+		if priority then
+			toolAnimTrack.Priority = priority
+		end
+
+		-- play the animation
+		toolAnimTrack:Play(transitionTime)
+		toolAnimName = animName
+		toolAnimInstance = anim
+
+		currentToolAnimKeyframeHandler = toolAnimTrack.KeyframeReached:connect(toolKeyFrameReachedFunc)
+	end
+end
+
+function stopToolAnimations()
+	local oldAnim = toolAnimName
+
+	if (currentToolAnimKeyframeHandler ~= nil) then
+		currentToolAnimKeyframeHandler:disconnect()
+	end
+
+	toolAnimName = ""
+	toolAnimInstance = nil
+	if (toolAnimTrack ~= nil) then
+		toolAnimTrack:Stop()
+		toolAnimTrack:Destroy()
+		toolAnimTrack = nil
+	end
+
+
+	return oldAnim
+end
+
+-------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------
+
+
+function onRunning(speed)
+	if speed > 0.01 then
+		playAnimation("walk", 0.1, Humanoid)
+		setAnimationSpeed(speed / 14.5)
+		pose = "Running"
+	else
+		if emoteNames[currentAnim] == nil then
+			playAnimation("idle", 0.1, Humanoid)
+			pose = "Standing"
+		end
+	end
+end
+
+function onDied()
+	pose = "Dead"
+end
+
+function onJumping()
+	playAnimation("jump", 0.1, Humanoid)
+	jumpAnimTime = jumpAnimDuration
+	pose = "Jumping"
+end
+
+function onClimbing(speed)
+	playAnimation("climb", 0.1, Humanoid)
+	setAnimationSpeed(speed / 12.0)
+	pose = "Climbing"
+end
+
+function onGettingUp()
+	pose = "GettingUp"
+end
+
+function onFreeFall()
+	if (jumpAnimTime <= 0) then
+		playAnimation("fall", fallTransitionTime, Humanoid)
+	end
+	pose = "FreeFall"
+end
+
+function onFallingDown()
+	pose = "FallingDown"
+end
+
+function onSeated()
+	pose = "Seated"
+end
+
+function onPlatformStanding()
+	pose = "PlatformStanding"
+end
+
+function onSwimming(speed)
+	if speed > 0 then
+		pose = "Running"
+	else
+		pose = "Standing"
+	end
+end
+
+function getTool()	
+	for _, kid in ipairs(Figure:GetChildren()) do
+		if kid.className == "Tool" then return kid end
+	end
+	return nil
+end
+
+function getToolAnim(tool)
+	for _, c in ipairs(tool:GetChildren()) do
+		if c.Name == "toolanim" and c.className == "StringValue" then
+			return c
+		end
+	end
+	return nil
+end
+
+function animateTool()
+
+	if (toolAnim == "None") then
+		playToolAnimation("toolnone", toolTransitionTime, Humanoid, Enum.AnimationPriority.Idle)
+		return
+	end
+
+	if (toolAnim == "Slash") then
+		playToolAnimation("toolslash", 0, Humanoid, Enum.AnimationPriority.Action)
+		return
+	end
+
+	if (toolAnim == "Lunge") then
+		playToolAnimation("toollunge", 0, Humanoid, Enum.AnimationPriority.Action)
+		return
+	end
+end
+
+function moveSit()
+	RightShoulder.MaxVelocity = 0.15
+	LeftShoulder.MaxVelocity = 0.15
+	RightShoulder:SetDesiredAngle(3.14 /2)
+	LeftShoulder:SetDesiredAngle(-3.14 /2)
+	RightHip:SetDesiredAngle(3.14 /2)
+	LeftHip:SetDesiredAngle(-3.14 /2)
+end
+
+local lastTick = 0
+
+function move(time)
+	local amplitude = 1
+	local frequency = 1
+	local deltaTime = time - lastTick
+	lastTick = time
+
+	local climbFudge = 0
+	local setAngles = false
+
+	if (jumpAnimTime > 0) then
+		jumpAnimTime = jumpAnimTime - deltaTime
+	end
+
+	if (pose == "FreeFall" and jumpAnimTime <= 0) then
+		playAnimation("fall", fallTransitionTime, Humanoid)
+	elseif (pose == "Seated") then
+		playAnimation("sit", 0.5, Humanoid)
+		return
+	elseif (pose == "Running") then
+		playAnimation("walk", 0.1, Humanoid)
+	elseif (pose == "Dead" or pose == "GettingUp" or pose == "FallingDown" or pose == "Seated" or pose == "PlatformStanding") then
+		--		print("Wha " .. pose)
+		stopAllAnimations()
+		amplitude = 0.1
+		frequency = 1
+		setAngles = true
+	end
+
+	if (setAngles) then
+		local desiredAngle = amplitude * math.sin(time * frequency)
+
+		RightShoulder:SetDesiredAngle(desiredAngle + climbFudge)
+		LeftShoulder:SetDesiredAngle(desiredAngle - climbFudge)
+		RightHip:SetDesiredAngle(-desiredAngle)
+		LeftHip:SetDesiredAngle(-desiredAngle)
+	end
+
+	-- Tool Animation handling
+	local tool = getTool()
+	if tool and tool:FindFirstChild("Handle") then
+
+		local animStringValueObject = getToolAnim(tool)
+
+		if animStringValueObject then
+			toolAnim = animStringValueObject.Value
+			-- message recieved, delete StringValue
+			animStringValueObject.Parent = nil
+			toolAnimTime = time + .3
+		end
+
+		if time > toolAnimTime then
+			toolAnimTime = 0
+			toolAnim = "None"
+		end
+
+		animateTool()		
+	else
+		stopToolAnimations()
+		toolAnim = "None"
+		toolAnimInstance = nil
+		toolAnimTime = 0
+	end
+end
+
+-- connect events
+Humanoid.Died:connect(onDied)
+Humanoid.Running:connect(onRunning)
+Humanoid.Jumping:connect(onJumping)
+Humanoid.Climbing:connect(onClimbing)
+Humanoid.GettingUp:connect(onGettingUp)
+Humanoid.FreeFalling:connect(onFreeFall)
+Humanoid.FallingDown:connect(onFallingDown)
+Humanoid.Seated:connect(onSeated)
+Humanoid.PlatformStanding:connect(onPlatformStanding)
+Humanoid.Swimming:connect(onSwimming)
+
+-- emote bindable hook
+script:WaitForChild("PlayEmote").OnInvoke = function(emote)
+	-- Only play emotes when idling
+	if pose ~= "Standing" then
+		return
+	end
+	if emoteNames[emote] ~= nil then
+		-- Default emotes
+		playAnimation(emote, EMOTE_TRANSITION_TIME, Humanoid)
+
+		if userPlayEmoteByIdAnimTrackReturn then
+			return true, currentAnimTrack
+		else
+			return true
+		end
+	end
+
+	-- Return false to indicate that the emote could not be played
+	return false
+end
+-- main program
+
+-- initialize to idle
+playAnimation("idle", 0.1, Humanoid)
+pose = "Standing"
+
+while Figure.Parent ~= nil do
+	local _, time = wait(0.1)
+	move(time)
+end  -  Editar
+  03:13:53.583  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.583  ------------------------------------------  -  Editar
+  03:13:53.583  PATH: Workspace.Characters.NPCs.Market.Core  -  Editar
+  03:13:53.583  TYPE: Script  -  Editar
+  03:13:53.584  ------------------------------------------  -  Editar
+  03:13:53.584  require(game.ServerStorage:WaitForChild("Storage"):WaitForChild("Modules"):WaitForChild("AI"):WaitForChild("GENERAL_STORE"))(script)  -  Editar
+  03:13:53.584  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.584  ------------------------------------------  -  Editar
+  03:13:53.584  PATH: Workspace.Characters.Scavenger.AI  -  Editar
+  03:13:53.584  TYPE: Script  -  Editar
+  03:13:53.584  ------------------------------------------  -  Editar
+  03:13:53.584  local character = script.Parent
+local humanoid = character:WaitForChild("Humanoid")
+local animator = humanoid:WaitForChild("Animator")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+local Debris = game:GetService("Debris")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local Debris = game:GetService("Debris")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local ClientStorage = ReplicatedStorage:WaitForChild("Storage")
+local Storage = ServerStorage:WaitForChild("Storage")
+
+local RagdollModule = require(Storage.Modules.Ragdoll)
+local Network = require(ClientStorage.Modules.Network)
+local CombatTag = require(ClientStorage.Modules.CombatTag)
+local CharacterEffects = require(Storage.Modules.CharacterEffects)
+
+local findTargetOverlapParams = OverlapParams.new()
+findTargetOverlapParams.FilterDescendantsInstances = {workspace.Characters}
+findTargetOverlapParams.FilterType = Enum.RaycastFilterType.Whitelist
+
+local config = {
+	characters = workspace.Characters,
+	
+	fov = 95,
+	
+	findTargetRadius = 100,
+	findWanderTargetRadius = 75,
+	findCoverGrid = {
+		[1] = Vector3.new(0, 0, 13),
+		[2] = Vector3.new(-2, 0, 13),
+		[3] = Vector3.new(2, 0, 13),
+		[4] = Vector3.new(4, 0, 13),
+		[5] = Vector3.new(-4, 0, 13),
+		[6] = Vector3.new(-6, 0, 13),
+		[7] = Vector3.new(6, 0, 13),
+		[8] = Vector3.new(8, 0, 13),
+		[9] = Vector3.new(-8, 0, 13),
+		[10] = Vector3.new(10, 0, 13),
+		[11] = Vector3.new(12, 0, 13),
+		[12] = Vector3.new(14, 0, 13),
+		[13] = Vector3.new(-10, 0, 13),
+		[14] = Vector3.new(-12, 0, 13),
+		[15] = Vector3.new(-14, 0, 13),
+		[16] = Vector3.new(-16, 0, 13),
+		[17] = Vector3.new(16, 0, 13)
+	},
+	findCoverDist = 30,
+	
+	states = {
+		{"reload", false},
+		{"aim", false},
+		{"fireActive", 0},
+		{"gunEquipped", false},
+		{"run", false},
+		{"isProne", false},
+		{"isCrouch", false},
+		{"gunEquip", false},
+		{"inspect", false},
+		{"unableToShoot", false},
+		{"meleeEquipped", false},
+		{"meleeAttack", false},
+		{"meleeFinisherAnim", false},
+		{"meleeFinisher", false},
+		{"carry", false},
+		{"finish", false}
+	},
+	
+	aimAccuracy = 2.5,
+	
+	targetOverlapParams = findTargetOverlapParams,
+	targetAlertDuration = 10,
+	forgetTargetOnSightLost = 4,
+	forgetTargetOnFarDistance = 45,
+	
+	fallBackEnemyCountOnFight = 5,
+	stayAlliesCountOnFight = 0,
+	
+	meleeAttackDist = 8,
+	meleeMinCloseDist = 3.5,
+	gunMinCloseFromOriginDist = 30,
+	targetCloseRangeNotice = 25,
+	wanderTargetRandomDist = 50,
+	wanderRandomDist = 5,
+	
+	baseSpeed = 12,
+	runSpeed = 16,
+	
+	weapons = {
+		"NPCAK",
+		"Glock 17",
+		"Tomahawk"
+	},
+	
+	team = "Scavenger",
+	
+	stuckTime = 3,
+	
+	canRespawn = true,
+	respawnTime = 50,
+	
+	debugMode = false,
+	rate = 5 / 25,
+}
+
+local clone
+if config.canRespawn then
+	clone = character:Clone()
+end
+script.Parent = workspace.Terrain
+
+for _,v in pairs(config.states) do
+	character:SetAttribute(v[1], v[2])
+end
+
+humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+
+character:SetAttribute("ActiveAI", true)
+humanoid:SetAttribute("Team", config.team or HttpService:GenerateGUID(false))
+humanoid:SetAttribute("Downed", false)
+humanoid:SetAttribute("Carried", false)
+local downedSFX = ClientStorage.Sounds.downed:Clone()
+downedSFX.Parent = character.Head
+
+local regenScript = ClientStorage.Miscs.Health:Clone()
+regenScript.Parent = character
+regenScript.Enabled = true
+
+local animateScript = ClientStorage.Miscs.Animate:Clone()
+animateScript.Parent = character
+animateScript.Enabled = true
+
+task.wait(1)
+
+local debug = require(script.__debug)
+local path = require(script.__path).new(character, {
+	AgentRadius = 1,
+	AgentCanClimb = true,
+	Costs = {
+		Water = 500,
+		NoPass = math.huge,
+	}
+})
+path.Visualize = config.debugMode
+
+local states = {
+	alertTick = 0,
+	damageAlertTick = 0,
+	targetPart = false,
+	coverDamage = false,
+	run = false,
+}
+
+local equippedTool
+local lastHealth = humanoid.Health
+local lastTargetPos
+local lastTargetAlertPos
+
+local function _disconnectEvents(connections: "Table")
+	for index,event in pairs(connections) do
+		event:Disconnect()
+		connections[index] = nil
+	end
+
+	connections = nil
+end
+
+local backpack = Instance.new("Folder")
+backpack.Name = character.Name .. "_Backpack"
+backpack.Parent = ReplicatedStorage.__tempSTORAGE.npc_backpacks
+
+local activePaths = {}
+local destroyConnections = {}
+local connections = {}
+local function cleanup()
+	pcall(function()
+		path:Destroy()
+		table.clear(activePaths)
+		if character:IsDescendantOf(workspace) then
+			character:Destroy()
+		end
+		
+		if ragdoll then
+			ragdoll:Destroy()
+		end
+		
+		_disconnectEvents(destroyConnections)
+		_disconnectEvents(connections)
+		
+		backpack:Destroy()
+		script:Destroy()
+	end)
+end
+table.insert(destroyConnections, character.Destroying:Connect(cleanup))
+table.insert(destroyConnections, character.AncestryChanged:Connect(function(_,parent)
+	if parent == nil then
+		cleanup()
+	end
+end))
+
+local characterRotation = Instance.new("BodyGyro")
+characterRotation.MaxTorque = Vector3.new(0, 10e5, 0)
+characterRotation.D = 25
+characterRotation.Parent = character
+
+local function getTableIndex(t: "Table")
+	local n = 0
+	for _,_ in pairs(t) do
+		n += 1
+	end
+	
+	return n
+end
+
+function isHumanoid(part: BasePart)
+	if part and part.Parent and part.Parent:FindFirstChild("Humanoid") then
+		return part.Parent
+	elseif part and part.Parent and part.Parent ~= workspace then
+		return isHumanoid(part.Parent)
+	end
+
+	return false
+end
+
+local function isObstacle(p1, p2, params)
+	local cast = workspace:Raycast((typeof(p1) == "Instance" and p1.Position or p1), (typeof(p2) == "Instance" and p2.Position or p2) - (typeof(p1) == "Instance" and p1.Position or p1), params)
+	if config.debugMode then
+		if cast then
+			debug:debugLine((typeof(p1) == "Instance" and p1.Position or p1), cast.Position - (typeof(p1) == "Instance" and p1.Position or p1), 1.5, Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 255, 0))
+		else
+			debug:debugLine((typeof(p1) == "Instance" and p1.Position or p1), (typeof(p2) == "Instance" and p2.Position or p2) - (typeof(p1) == "Instance" and p1.Position or p1), 1.5, nil, nil, Color3.fromRGB(255, 0, 0))
+		end
+	end
+	
+	return cast
+end
+
+local function getRandomChild(parent)
+	return parent:GetChildren()[math.random(#parent:GetChildren())]
+end
+
+local function getDistance(p1, p2)
+	return ((typeof(p1) == "Instance" and p1.Position or p1) - (typeof(p2) == "Instance" and p2.Position or p2)).magnitude
+end
+
+local function clampDistanceBetweenVectors(V1, V2, Max) -- V1 is origin.
+	return V1 + ((V2 - V1).Unit * math.min((V2 - V1).Magnitude,  Max))
+end
+
+local function angleBetween(vectorA: Vector3, vectorB: Vector3)
+	return math.acos(math.clamp(vectorA:Dot(vectorB), -1, 1))
+end
+
+local function isInFOV(target: BasePart, fov: number)
+	local lookForward = humanoid.RootPart.CFrame.LookVector
+	local lookToPoint = (target.CFrame.Position - humanoid.RootPart.Position).unit
+	local angle = angleBetween(lookForward, lookToPoint)
+	return math.abs(angle) <= math.rad(fov)
+end
+
+local function isGun(tool: Tool)
+	return tool:GetAttribute("Arms") and not tool:GetAttribute("Melee")
+end
+
+local function isMelee(tool: Tool)
+	return tool:GetAttribute("Arms") and tool:GetAttribute("Melee")
+end
+
+local function detectTarget(part: BasePart)
+	return isInFOV(part, config.fov) or getDistance(part, humanoid.RootPart) <= config.targetCloseRangeNotice
+end
+
+local function getTargets(findRadius: number, ignoreObstacles: boolean, ignoreFOV: boolean, isAllies: boolean, includeDeadTarget: boolean)
+	local targets = {}
+	local hitted = {}
+	local collideParts = workspace:GetPartBoundsInRadius(humanoid.RootPart.Position, findRadius, config.targetOverlapParams)
+	for _,part in pairs(collideParts) do
+		local target = isHumanoid(part)
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {character, target or part, workspace.Ignored}
+		if target and target:IsDescendantOf(config.characters) and target ~= character and target:FindFirstChild("Humanoid") and (not target.Humanoid:GetAttribute("Team") or not isAllies and target.Humanoid:GetAttribute("Team") ~= humanoid:GetAttribute("Team") or isAllies and target.Humanoid:GetAttribute("Team") == humanoid:GetAttribute("Team")) and target.Humanoid.RootPart and (target.Humanoid.Health > 0 or includeDeadTarget) and not hitted[target] and part.Parent == target and not target:FindFirstChildWhichIsA("ForceField") and (ignoreObstacles or not isObstacle(humanoid.RootPart, part, params)) and (isInFOV(part, config.fov) or ignoreFOV or getDistance(part, humanoid.RootPart) <= config.targetCloseRangeNotice) then
+			hitted[target] = true
+			targets[#targets + 1] = target
+		end
+	end
+	
+	table.clear(hitted)
+	
+	return targets
+end
+
+local function findClosedTarget(findRadius: number, ignoreObstacles: boolean, ignoreFOV: boolean, isAllies: boolean, includeDeadTarget: boolean)
+	if humanoid.RootPart then
+		local target, dist = nil, math.huge
+		
+		local targets = getTargets(findRadius, ignoreObstacles, ignoreFOV, isAllies, includeDeadTarget)		
+		for _,v in pairs(targets) do
+			local targetDist = getDistance(v.Humanoid.RootPart, humanoid.RootPart)
+			if targetDist < dist then
+				target = v
+				dist = targetDist
+			end
+		end
+		
+		table.clear(targets)
+		
+		return target, dist
+	end
+	
+	return false
+end
+
+local function checkLadder(part: BasePart)
+	local overlapParams = OverlapParams.new()
+	overlapParams.FilterDescendantsInstances = {config.characters, workspace.Ignored}
+	local collideParts = workspace:GetPartBoundsInRadius(part and part.Position or humanoid.RootPart.Position, 3, overlapParams)
+	for _,v in pairs(collideParts) do
+		if v:IsA("TrussPart") then
+			return v
+		end
+	end
+	
+	return false
+end
+
+local function canJump(params: RaycastParams?)
+	return not isObstacle(humanoid.RootPart, humanoid.RootPart.Position + Vector3.new(0, humanoid.JumpPower ^ 2 / (2 * workspace.Gravity), 0), params)
+end
+
+local function unequipTools()
+	for _,v in pairs(character:GetChildren()) do
+		if v:IsA("Tool") then
+			v.Parent = backpack
+		end
+	end
+end
+
+local function equipTool(tool: Tool | string)
+	unequipTools()
+	if typeof(tool) == "Instance" then
+		tool.Parent = character
+	else
+		local backpackTool = backpack:FindFirstChild(tool)
+		if backpackTool then
+			backpackTool.Parent = character
+		end
+	end
+end
+
+local function stopPaths(hash: string)
+	if hash then
+		activePaths[hash] = false
+	else
+		for hash,_ in pairs(activePaths) do
+			activePaths[hash] = false
+		end
+	end
+end
+
+local function moveTo(point: Vector3, timeout: number)
+	task.spawn(function()
+		stopPaths()
+		local hash = HttpService:GenerateGUID(false)
+		activePaths[hash] = true
+
+		local status = {
+			reached = false,
+			blocked = false,
+			error = false,
+
+			skipped = false,
+		}
+
+		local connections = {}
+		table.insert(connections, path.Reached:Connect(function()
+			status.reached = true
+		end))
+
+		table.insert(connections, path.Blocked:Connect(function(_, waypoint)
+			status.blocked = true
+			status.skipped = true
+			
+			humanoid.Jump = true
+		end))
+
+		table.insert(connections, path.Error:Connect(function(errorType)
+			status.error = true
+			status.skipped = true
+			
+			if errorType == "AgentStuck" and humanoid:GetState() ~= Enum.HumanoidStateType.Climbing then
+				humanoid.Jump = true
+			end
+		end))
+		
+		if humanoid.Sit then
+			humanoid.Jump = true
+		end
+
+		if not character:GetAttribute("meleeFinisher") then
+			pcall(function() 
+				local computed = path:Run(point)
+			end)
+		end
+
+		local t = tick()
+		while tick() - t < timeout and not status.reached and not status.skipped and activePaths[hash] do
+			task.wait(config.rate)
+		end
+		
+		_disconnectEvents(connections)
+		table.clear(status)
+		activePaths[hash] = nil
+	end)
+end
+
+local function findCover(fromPart: BasePart, fromPartModel: Model)
+	local coverSpots = {}
+	for _,pos in pairs(config.findCoverGrid) do
+		local origin = (humanoid.RootPart.CFrame * CFrame.new(pos)).p
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {fromPartModel or fromPart, character, workspace.Ignored, config.characters}
+		local cast = workspace:Raycast(origin, fromPart.CFrame.LookVector * -config.findCoverDist, params)
+		if config.debugMode then
+			if cast then
+				debug:debugLine(origin, cast.Position - origin, 0.5)
+			else
+				debug:debugLine(origin, fromPart.CFrame.LookVector * -config.findCoverDist, 0.5, nil, nil, Color3.fromRGB(255, 0, 0))
+			end
+		end
+		
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {character, fromPartModel or fromPart, workspace.Ignored}
+		local addPos = (humanoid.RootPart.CFrame * CFrame.new(Vector3.new(pos.x, 0, 0).unit * 2.5)).p - humanoid.RootPart.Position
+		if cast and isObstacle(fromPart.Position, cast.Position + cast.Normal + addPos, params) then
+			coverSpots[#coverSpots + 1] = {cast, addPos}
+		end
+	end
+	
+	local spot, pos, dist = nil, nil, math.huge
+	for _,v in pairs(coverSpots) do
+		local spotDist = getDistance(v[1].Position, humanoid.RootPart)
+		if spotDist < dist then
+			spot = v[1]
+			pos = v[2]
+			dist = spotDist
+		end
+	end
+	
+	return spot, pos
+end
+
+local function takeCover(jump: boolean, reload: boolean, rush: boolean)
+	if not states.coverDamage and states.target then
+		states.coverDamage = true
+		local cover,pos = findCover(states.target.part, states.target.character)
+		if cover then
+			if rush then
+				states.run = true
+			end
+			local params = RaycastParams.new()
+			params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+			if jump and math.random(2) == 1 and canJump(params) then
+				humanoid.Jump = true
+			end
+			local dist = cover.Position + cover.Normal + pos
+			local timeout = getDistance(dist, humanoid.RootPart) + 0.5
+			moveTo(dist, 1)
+			local t = tick()
+			task.wait(timeout / humanoid.WalkSpeed)
+			local reloaded = false
+			if reload and equippedTool and (not states.target or isObstacle(humanoid.RootPart, states.target.part, params)) then
+				reloaded = true
+				equippedTool.activateEvent:Fire(Enum.KeyCode.R, "began")
+			elseif not reload and (not states.target or isObstacle(humanoid.RootPart, states.target.part, params)) then
+				states.run = false
+			end
+			
+			local strafeTick = 0
+			local strafeSwapTick = 0
+			local strafePos = math.random(1, 2)
+			while tick() - t < 3 do
+				local coverTarget,_ = findClosedTarget(config.findTargetRadius)
+				if coverTarget then
+					if not states.target or states.target.character ~= coverTarget then
+						states.target = {part = coverTarget.Humanoid.RootPart, character = coverTarget}
+						params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+					end
+					if coverTarget.Humanoid:GetAttribute("Downed") then
+						break
+					end
+					local params = RaycastParams.new()
+					params.FilterDescendantsInstances = {character, coverTarget, workspace.Ignored}
+					if getDistance(coverTarget.Humanoid.RootPart, humanoid.RootPart) > 5 and not isObstacle(humanoid.RootPart, coverTarget.Humanoid.RootPart, params) then
+						local cover,pos = findCover(coverTarget.Humanoid.RootPart, coverTarget)
+						if cover then
+							local dist = cover.Position + cover.Normal + pos
+							local timeout = getDistance(dist, humanoid.RootPart) + 0.5
+							if config.debugMode then
+								debug:point(dist, 1.5)
+							end
+							moveTo(dist, 1)
+							task.wait(timeout / humanoid.WalkSpeed)
+							if reload and equippedTool and not reloaded and (not coverTarget:IsDescendantOf(workspace) or not coverTarget.Humanoid.RootPart or isObstacle(humanoid.RootPart, coverTarget.Humanoid.RootPart, params)) then
+								equippedTool.activateEvent:Fire(Enum.KeyCode.R, "began")
+								states.run = false
+							elseif not reload and (not coverTarget:IsDescendantOf(workspace) or not coverTarget.Humanoid.RootPart or isObstacle(humanoid.RootPart, coverTarget.Humanoid.RootPart, params)) then
+								states.run = false
+							end
+							t = tick()
+						else
+							moveTo(clampDistanceBetweenVectors(coverTarget.Humanoid.RootPart.Position, humanoid.RootPart.Position, 20), 1)
+						end
+					else
+						if canJump(params) and math.random(5) == 1 then
+							humanoid.Jump = true
+						end
+						moveTo(clampDistanceBetweenVectors(coverTarget.Humanoid.RootPart.Position, humanoid.RootPart.Position, 20), 1)
+					end
+				else
+					local strafeDir = {
+						humanoid.RootPart.CFrame.RightVector * 5, 
+						humanoid.RootPart.CFrame.RightVector * -5,
+					}
+
+					if tick() - strafeTick >= 0.5 and not character:GetAttribute("meleeFinisher") then
+						strafeTick = tick()
+						humanoid:MoveTo(humanoid.RootPart.Position + strafeDir[math.random(#strafeDir)] + strafeDir[strafePos])
+						if tick() - strafeSwapTick >= 3 then
+							strafeSwapTick = tick()
+							strafePos = math.random(1, 2)
+						end
+					end
+				end
+
+				task.wait(config.rate)
+			end
+		else
+			moveTo(clampDistanceBetweenVectors(states.target.part.Position, humanoid.RootPart.Position, 100), 1)
+			if reload and equippedTool then
+				equippedTool.activateEvent:Fire(Enum.KeyCode.R, "began")
+			end
+		end
+		states.coverDamage = false
+	elseif reload and equippedTool then
+		equippedTool.activateEvent:Fire(Enum.KeyCode.R, "began")
+	end
+end
+
+local function enemy()
+	local target,_ = findClosedTarget(config.findTargetRadius, false, tick() - states.damageAlertTick < 0.5)
+	if target then
+		states.alertTick = tick()
+		stopPaths()
+		states.target = {part = target.Humanoid.RootPart, character = target}
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+		local takeCoverFast = getDistance(states.target.part, humanoid.RootPart) <= 15 and (not equippedTool or isGun(equippedTool))
+		if math.random(2) == 1 or takeCoverFast or #getTargets(config.findTargetRadius * 1.5) >= config.fallBackEnemyCountOnFight and #getTargets(config.findTargetRadius, false, true, true) < config.stayAlliesCountOnFight then
+			if not target.Humanoid:GetAttribute("Downed") then
+				takeCover(false, false, takeCoverFast and true)
+			end
+		end
+		local onSightTick = tick()
+		
+		local strafeTick = 0
+		local strafeSwapTick = 0
+		local strafePos = math.random(1, 2)
+		
+		local lastSeenPosition = states.target.part.Position
+		local lostSightRadius = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
+		character:SetAttribute("aim", true)
+		lastTargetAlertPos = states.target.part.Position
+		local originRootPos = humanoid.RootPart.Position
+		if equippedTool and isMelee(equippedTool) then
+			states.run = true
+		end
+		while target:IsDescendantOf(workspace) and target.Humanoid.Health > 0 and target.Humanoid.RootPart and getDistance(target.Humanoid.RootPart, humanoid.RootPart) < config.forgetTargetOnFarDistance do
+			local onSight = not isObstacle(humanoid.RootPart, states.target.part, params)
+			if onSight and detectTarget(states.target.part) or checkLadder() then
+				onSightTick = tick()
+				lastSeenPosition = states.target.part.Position
+				lostSightRadius = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
+			elseif tick() - onSightTick >= config.forgetTargetOnSightLost then
+				lastTargetPos = lastSeenPosition
+				lastTargetAlertPos = lastSeenPosition
+				break
+			--[[elseif not onSight and target.Humanoid.Health > 50 and equippedTool and isGun(equippedTool) then
+				takeCover(false, false, true)]]
+			end
+			
+			if math.random(5) == 1 and not states.target.character.Humanoid:GetAttribute("Downed") and #getTargets(config.findTargetRadius) >= config.fallBackEnemyCountOnFight and #getTargets(config.findTargetRadius, false, true, true) < config.stayAlliesCountOnFight or humanoid:GetAttribute("Downed") then
+				takeCover(false, false, true)
+			end
+			
+			if equippedTool and isGun(equippedTool) and not states.target.character.Humanoid:GetAttribute("Downed") and ((equippedTool._data.magCurrent.Value / equippedTool._data.magSize.Value) * 1 <= 0.3 and math.random(3) == 1 or equippedTool._data.magCurrent.Value <= 0) and equippedTool._data.ammo.Value > 0 then
+				takeCover(false, true, true)
+			end
+			
+			local otherCloserTarget,_ = findClosedTarget(config.findTargetRadius)
+			if otherCloserTarget and otherCloserTarget ~= target then
+				target = otherCloserTarget
+				states.target = {part = target.Humanoid.RootPart, character = target}
+				params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+				originRootPos = humanoid.RootPart.Position
+			end
+			
+			local ladderPart = checkLadder()
+			local targetIsClimbing = checkLadder(states.target.part) == ladderPart and ladderPart ~= false
+			if targetIsClimbing then
+				moveTo(ladderPart.Position + Vector3.new(0, ladderPart.Size.y / 2, 0), 1)
+			else
+				if equippedTool and isGun(equippedTool) then
+					local strafeDir = {
+						humanoid.RootPart.CFrame.RightVector * 5, 
+						humanoid.RootPart.CFrame.RightVector * -5,
+					}
+					
+					if getDistance(originRootPos, lastSeenPosition) < config.gunMinCloseFromOriginDist then
+						if onSight then
+							moveTo(clampDistanceBetweenVectors(lastSeenPosition + strafeDir[math.random(#strafeDir)], originRootPos, config.gunMinCloseFromOriginDist), 1)
+						else
+							moveTo(lastSeenPosition + lostSightRadius + strafeDir[math.random(#strafeDir)], 1)
+						end
+					elseif tick() - strafeTick >= 0.5 and not character:GetAttribute("meleeFinisher") then
+						strafeTick = tick()
+						humanoid:MoveTo(humanoid.RootPart.Position + strafeDir[math.random(#strafeDir)] + strafeDir[strafePos])
+						if tick() - strafeSwapTick >= 3 then
+							strafeSwapTick = tick()
+							strafePos = math.random(1, 2)
+						end
+					end
+				elseif equippedTool and isMelee(equippedTool) then
+					moveTo(onSight and clampDistanceBetweenVectors(lastSeenPosition, humanoid.RootPart.Position, config.meleeMinCloseDist) or lastSeenPosition + lostSightRadius, 1)
+				else
+					moveTo(onSight and lastSeenPosition or lastSeenPosition + lostSightRadius, 1)
+				end
+			end
+			while states.coverDamage do
+				if target:IsDescendantOf(workspace) and target.Humanoid.Health > 0 and target.Humanoid.RootPart and not isObstacle(humanoid.RootPart, states.target.part, params) then
+					onSightTick = tick()
+				end
+				task.wait(config.rate * 2)
+			end
+			if states.target and target ~= states.target.character then
+				target = states.target.character
+			end
+			
+			local waitTime = checkLadder() and humanoid:GetState() == Enum.HumanoidStateType.Climbing and math.max(getDistance(lastSeenPosition, humanoid.RootPart) / 40, 3) or ladderPart and 1 or config.rate
+			if waitTime <= config.rate then
+				task.wait(config.rate)
+			else
+				local t = tick()
+				while tick() - t < waitTime do
+					if getDistance(lastSeenPosition, humanoid.RootPart) <= 1 then
+						break
+					end
+					if states.target.part.Position.y < humanoid.RootPart.Position.y - 5 and not isObstacle(humanoid.RootPart, states.target.part, params) then
+						humanoid.Jump = true
+						task.wait()
+						break
+					end
+					task.wait(config.rate)
+				end
+			end
+		end
+		
+		character:SetAttribute("aim", false)
+		table.clear(states.target)
+		states.target = false
+		states.run = false
+		return true
+	else
+		if typeof(states.target) == "table" then
+			table.clear(states.target)
+		end
+		states.target = false
+	end
+	
+	return false
+end
+
+local function loadAnim(id)
+	local animTrack = Instance.new("Animation")
+	animTrack.AnimationId = "rbxassetid://" .. id
+	return animator:LoadAnimation(animTrack),
+		animTrack:Destroy()
+end
+
+local downed_anim = {
+	idle = loadAnim(15509088751),
+	move = loadAnim(15509089692)
+}
+
+local runAnim = loadAnim(15509088120)
+runAnim.Priority = Enum.AnimationPriority.Idle
+
+table.insert(connections, humanoid.HealthChanged:Connect(function(hp)
+	local damage = lastHealth - hp
+	if hp > 5 and (hp / humanoid.MaxHealth) * 100 < 15 and not humanoid:GetAttribute("Downed") and damage < 80 then
+		humanoid:SetAttribute("RagdollDur", 2.5)
+		humanoid:SetAttribute("Ragdoll", true)
+		humanoid:SetAttribute("Downed", true)
+	end
+	
+	if damage > 0 then
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {workspace.Ignored, workspace.Characters}
+		if math.random(3) == 1 and canJump(params) then
+			humanoid.Jump = true
+		end 
+		states.run = true
+		task.delay(math.random(10, 25) / 10, function()
+			states.run = false
+		end)
+		states.damageAlertTick = tick()
+		takeCover(true)
+	end
+
+	lastHealth = humanoid.Health
+end))
+
+local jumpPower = humanoid.JumpPower
+table.insert(connections, humanoid:GetAttributeChangedSignal("Downed"):Connect(function()
+	local downed = humanoid:GetAttribute("Downed")
+	if downed then
+		humanoid.Health = humanoid.MaxHealth
+		humanoid.WalkSpeed = 2
+		humanoid.HipHeight = -2
+		humanoid.JumpPower = 0
+	else
+		humanoid.Health = 30
+		humanoid.WalkSpeed = game:GetService("StarterPlayer").CharacterWalkSpeed
+		humanoid.HipHeight = 0
+		downedSFX:Stop()
+		humanoid.JumpPower = jumpPower
+	end
+
+	local torso = character:FindFirstChild("Torso")
+	if torso then
+		torso.CollisionGroup = downed and "NoCollisions" or (humanoid.Health > 0 and "Alive" or "Death")
+	end
+
+	if humanoid.RootPart then
+		humanoid.RootPart.CanCollide = downed
+	end
+end))
+
+for _,p in pairs(character:GetChildren()) do
+	if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+		p.CollisionGroup = "Alive"
+	elseif p.Name == "HumanoidRootPart" then
+		p.CollisionGroup = "CollisionNoRaycast"
+	end
+end
+
+table.insert(connections, humanoid.Died:Connect(function()
+	downedSFX:Stop()
+	for _,p in pairs(character:GetChildren()) do
+		if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+			p.CollisionGroup = "Death"
+		elseif p.Name == "HumanoidRootPart" then
+			p.CollisionGroup = "CollisionNoRaycast"
+		end
+	end
+
+	if character:FindFirstChild("Head") then
+		for _,sound in pairs(character.Head:GetChildren()) do
+			if sound.Name == "hurt" then
+				sound:Destroy()
+			end
+		end
+	end
+
+	if humanoid.RootPart then
+		Network:FireAllClients("client", "createSound", getRandomChild(ClientStorage.Sounds.died), humanoid.RootPart)
+		humanoid.RootPart.CanCollide = false
+		local deadLight = ClientStorage.Miscs.deadLight:Clone()
+		deadLight.Parent = humanoid.RootPart
+	end
+
+	local killer, damage, weapon = CombatTag:getKiller(character)
+	if killer and Players:FindFirstChild(killer) then
+		Network:FireClient(Players[killer], "client", "killFX", character.Name, weapon)
+		ClientStorage.Events.kill:Fire(Players[killer], "dummy")
+	end
+
+	if config.canRespawn then
+		task.wait(config.respawnTime)
+		clone.Parent = character.Parent
+		cleanup()
+	end
+end))
+
+for _,v in pairs(script.Parent:GetDescendants()) do
+	if (v:IsA("BasePart") and (v.Parent:IsA("Accessory") or v.Parent.Parent:IsA("Accessory"))) then
+		v.CollisionGroup = "Debris"
+	elseif(v:IsA("CharacterMesh")) then
+		v:Destroy()
+	end
+end
+
+ragdoll = RagdollModule.create(character, true)
+ragdoll:registerEvent()
+table.insert(connections, humanoid:GetAttributeChangedSignal("Ragdoll"):Connect(function()
+	local state = humanoid:GetAttribute("Ragdoll")
+	ragdoll:set(state)
+	if not state and humanoid:GetAttribute("Downed") then
+		downedSFX:Play()
+	end
+
+	local downed = humanoid:GetAttribute("Downed")
+	local torso = character:FindFirstChild("Torso")
+	if torso then
+		if downed and humanoid:GetAttribute("Ragdoll") then
+			torso.CollisionGroup = humanoid.Health > 0 and "Alive" or "Death"
+		elseif downed and not humanoid:GetAttribute("Ragdoll") then
+			torso.CollisionGroup = "NoCollisionsRaycast"
+		end
+	end
+end))
+CharacterEffects:createEffects(humanoid)
+
+local function isMoving()
+	return humanoid.RootPart and Vector3.new(humanoid.RootPart.Velocity.x, 0, humanoid.RootPart.Velocity.z).magnitude > 0.1
+end
+
+local characterSpeed = humanoid.WalkSpeed
+table.insert(connections, humanoid.Running:Connect(function(speed)
+	characterSpeed = speed
+end))
+
+for _,weaponName in pairs(config.weapons) do
+	ClientStorage.Events.giveTool:Invoke(weaponName, backpack)
+end
+task.delay(1, function()
+	equipTool("NPCAK")
+end)
+
+local toolActivated = false
+local clientUpdateTime = 0 
+local stuckHeat = tick()
+task.spawn(function()
+	local lastLookPos
+	while humanoid.RootPart and humanoid.RootPart:IsDescendantOf(workspace) do
+		local isAlert = tick() - states.alertTick <= config.targetAlertDuration
+		if states.target and not humanoid:GetAttribute("Downed") then
+			if not lastLookPos then
+				lastLookPos = states.target.part.Position + (states.target.part.CFrame.UpVector * 2.5)
+			end
+			characterRotation.CFrame = CFrame.new(humanoid.RootPart.Position, (lastLookPos - humanoid.RootPart.Position).unit * 10000)
+		elseif humanoid:GetAttribute("Downed") and isMoving() then
+			characterRotation.CFrame = CFrame.new(Vector3.new(humanoid.RootPart.Position.x, humanoid.RootPart.Position.y + 75, humanoid.RootPart.Position.z), Vector3.new(humanoid.RootPart.Position.x, humanoid.RootPart.Position.y - 75, humanoid.RootPart.Position.z) + ((humanoid.RootPart.Velocity * Vector3.new(1, 0, 1)).unit * -50))
+		elseif not states.target and isAlert and lastTargetAlertPos then
+			characterRotation.CFrame = CFrame.new(humanoid.RootPart.Position, (lastTargetAlertPos - humanoid.RootPart.Position).unit * 10000)
+		end
+		
+		if not isAlert and lastTargetAlertPos then
+			lastTargetAlertPos = nil
+		end
+		
+		local params
+		if states.target then
+			params = RaycastParams.new()
+			params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+		end
+		local targetSightBlocked = states.target and isObstacle(humanoid.RootPart, states.target.part, params)
+		local ladderPart = checkLadder()
+		if states.target and not targetSightBlocked and detectTarget(states.target.part) and not ladderPart then
+			lastLookPos = states.target.part.Position
+		elseif ladderPart then
+			lastLookPos = ladderPart.Position
+		end
+		if (states.target or ladderPart or humanoid:GetAttribute("Downed") or isAlert) and not humanoid:GetAttribute("Ragdoll") and not humanoid:GetAttribute("Carried") then
+			characterRotation.Parent = humanoid.RootPart
+		else
+			characterRotation.Parent = nil
+		end
+		
+		local vel = humanoid.RootPart and Vector3.new(humanoid.RootPart.Velocity.x, 0, humanoid.RootPart.Velocity.z).magnitude or 0
+		local forward = humanoid.RootPart and humanoid.MoveDirection:Dot(humanoid.RootPart.CFrame.LookVector) > -0.1
+		local animUnit = 1
+		if not forward then
+			animUnit = -1
+		end
+		
+		if humanoid:GetAttribute("Downed") and not humanoid:GetAttribute("Carried") then
+			if not downed_anim.idle.IsPlaying and (not isMoving() or humanoid.WalkSpeed <= 0) then
+				downed_anim.idle:Play()
+			elseif not downed_anim.move.IsPlaying and isMoving() and humanoid.WalkSpeed > 0 then
+				downed_anim.move:Play()
+				downed_anim.idle:Stop()
+			elseif downed_anim.move.IsPlaying then
+				if humanoid.WalkSpeed > 0 then	
+					downed_anim.move:AdjustSpeed((vel / 1.8) * animUnit)
+				else
+					downed_anim.move:Stop(0.5)
+				end
+			end
+		elseif downed_anim.idle.IsPlaying or downed_anim.move.IsPlaying then
+			downed_anim.idle:Stop()
+			downed_anim.move:Stop()
+		end
+		
+		local justFired = tick() - character:GetAttribute("fireActive") < (1 / 10)
+		humanoid.AutoRotate = not states.target and not humanoid:GetAttribute("Ragdoll") and not humanoid:GetAttribute("Downed")
+		if not character:GetAttribute("meleeFinisher") then
+			humanoid.WalkSpeed = humanoid:GetAttribute("Downed") and 2 or (character:GetAttribute("reload") or justFired) and 5 or states.run and config.runSpeed or config.baseSpeed
+		end
+		--humanoid.WalkSpeed = (revive or carry_db) and 0 or downed and ((_G.reload or tick() - _G.fireActive <= 1) and 0 or 2) or _G.isProne and 3 or (_G.reload or _G.foodUse or justFired or _G.isCrouch) and 5 or _G.aim and not _G.grenadeUse and 7 or _G.grenadeUse and 9 or game:GetService("StarterPlayer").CharacterWalkSpeed
+		local vel = humanoid.RootPart.AssemblyLinearVelocity.magnitude
+		if vel > 0.1 then
+			stuckHeat = tick()
+		elseif getTableIndex(activePaths) > 0 and tick() - stuckHeat >= config.stuckTime then
+			stopPaths()
+			local points = {
+				humanoid.RootPart.CFrame.LookVector,
+				-humanoid.RootPart.CFrame.LookVector,
+				humanoid.RootPart.CFrame.RightVector,
+				-humanoid.RootPart.CFrame.RightVector
+			}
+			local unstuckPos = Vector3.new()
+			local params = RaycastParams.new()
+			params.FilterDescendantsInstances = {character, config.characters, workspace.Ignored}
+			for _,p in pairs(points) do
+				local cast = workspace:Raycast(humanoid.RootPart.Position - (humanoid.RootPart.CFrame.UpVector * -2.5), p.unit * 1.5, params)
+				if not cast then
+					unstuckPos += p.unit * 5
+				end
+			end
+			
+			if unstuckPos.magnitude <= 0 then
+				unstuckPos += Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
+			end
+			if not character:GetAttribute("meleeFinisher") then
+				humanoid:MoveTo(humanoid.RootPart.Position + unstuckPos)
+			end
+			if not canJump(params) then
+				humanoid.Jump = true
+			end
+		end
+		
+		if states.run and isMoving() and not character:GetAttribute("reload") then
+			if not runAnim.IsPlaying then
+				runAnim:Play(0.3)
+			end
+		else
+			runAnim:Stop()
+		end
+		
+		if runAnim.IsPlaying then
+			runAnim:AdjustSpeed((characterSpeed / 19.5) * animUnit)
+		end
+		
+		if humanoid:GetState() ~= Enum.HumanoidStateType.Running and states.run then
+			if runAnim.IsPlaying then
+				runAnim:Stop()
+			end
+		elseif states.run and not runAnim.IsPlaying and isMoving() then
+			runAnim:Play(0.3)
+		end
+		
+		if character:GetAttribute("reload") then
+			states.run = false
+		end
+		
+		local tool = character:FindFirstChildWhichIsA("Tool")
+		if tool and tool:FindFirstChild("activateEvent") then
+			if states.target then
+				tool:SetAttribute("AimDir", (states.target.part.Position - character.Head.Position) 
+					+ (Vector3.new(
+						math.random(-100, 100),
+						math.random(-100, 100),
+						math.random(-100, 100)
+						) / 100) * config.aimAccuracy
+				)
+			end
+			
+			if states.target and detectTarget(states.target.part) and not targetSightBlocked then
+				if isGun(tool) and tool._data.magCurrent.Value > 0 and not character:GetAttribute("reload") and not toolActivated then
+					toolActivated = true
+					tool.activateEvent:Fire(Enum.UserInputType.MouseButton1, "began")
+					task.delay(math.clamp(15 / getDistance(states.target.part, humanoid.RootPart), 0.15, 0.8), function()
+						if tool:IsDescendantOf(character) then
+							tool.activateEvent:Fire(Enum.UserInputType.MouseButton1, "ended")
+						end
+						task.wait(math.random(5, 10) / 10)
+						toolActivated = false
+					end)
+				elseif isMelee(tool) and not toolActivated and (getDistance(states.target.part, humanoid.RootPart.Position + (humanoid.RootPart.AssemblyLinearVelocity / 2)) <= config.meleeAttackDist or tick() - states.damageAlertTick < 0.5 and math.random(2) == 1 and getDistance(states.target.part, humanoid.RootPart.Position) <= config.meleeAttackDist + 2) then
+					if states.target.character.Humanoid:GetAttribute("Downed") and math.random(2) == 1 and getDistance(states.target.part, humanoid.RootPart.Position) <= config.meleeMinCloseDist + 2 then
+						toolActivated = true
+						tool.activateEvent:Fire(states.target.character, "finisher")
+						toolActivated = false
+					elseif math.random(2) == 1 then
+						toolActivated = true
+						tool.activateEvent:Fire(Enum.UserInputType.MouseButton1, "began")
+						task.delay(1 / 30, function()
+							if tool:IsDescendantOf(character) then
+								tool.activateEvent:Fire(Enum.UserInputType.MouseButton1, "ended")
+							end
+							toolActivated = false
+						end)
+					end
+				end
+			end
+			
+			equippedTool = tool
+		else
+			equippedTool = nil
+		end
+		
+		if tick() - clientUpdateTime >= 1 / 10 and lastLookPos then
+			clientUpdateTime = tick()
+
+			Network:FireAllClients("client", "updates", character, {
+				mouseOrigin = humanoid.RootPart.Position,
+				mouseDir = states.target and lastLookPos or (humanoid.RootPart.Position + humanoid.RootPart.CFrame.LookVector * 10),
+				cameraCF = states.target and CFrame.new(character.Head.Position, lastLookPos) or CFrame.new(character.Head.Position, character.Head.Position + (character.Head.CFrame.LookVector * 10)),
+				neckAngle = character:GetAttribute("aim") and equippedTool and isGun(equippedTool) and -30 or 0,
+			})
+		end
+		
+		task.wait(config.rate)
+	end
+	
+	cleanup()
+end)
+
+while humanoid.RootPart do
+	if tick() - states.alertTick >= config.targetAlertDuration or not findClosedTarget(config.findTargetRadius) then
+		local wanderTarget,_ = findClosedTarget(config.findWanderTargetRadius, true)
+		if wanderTarget then
+			if lastTargetPos then
+				moveTo(clampDistanceBetweenVectors(lastTargetPos, humanoid.RootPart.Position, 80), 3)
+				lastTargetPos = nil
+			else
+				moveTo(wanderTarget.Humanoid.RootPart.Position + Vector3.new(math.random(-config.wanderTargetRandomDist, config.wanderTargetRandomDist), 0, math.random(-config.wanderTargetRandomDist, config.wanderTargetRandomDist)), math.random(5, 10))
+			end
+		else
+			if math.random(5) == 1 and not lastTargetPos then
+				moveTo(Vector3.new(math.random(-config.wanderRandomDist, config.wanderRandomDist), 0, math.random(-config.wanderRandomDist, config.wanderRandomDist)), math.random(5, 10))
+			elseif lastTargetPos then
+				moveTo(clampDistanceBetweenVectors(lastTargetPos, humanoid.RootPart.Position, 80), 3)
+				lastTargetPos = nil
+			end
+		end
+		
+		while getTableIndex(activePaths) > 0 do
+			enemy()
+			task.wait(config.rate)
+		end
+	else
+		enemy()
+	end
+	
+	task.wait(config.rate)
+end  -  Editar
+  03:13:53.584  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.584  ------------------------------------------  -  Editar
+  03:13:53.584  PATH: Workspace.Characters.Scavenger.AI.__path  -  Editar
+  03:13:53.584  TYPE: ModuleScript  -  Editar
+  03:13:53.584  ------------------------------------------  -  Editar
+  03:13:53.584  --[[
+-------------------------------------------------------------------
+
+Created by: @V3N0M_Z
+Reference: https://v3n0m-z.github.io/RBLX-SimplePath/
+License: MIT
+
+---------------------------------------------------------------------
+]]
+
+local DEFAULT_SETTINGS = {
+
+	TIME_VARIANCE = 0.07;
+
+	COMPARISON_CHECKS = 3;
+
+	JUMP_WHEN_STUCK = false;
+}
+
+---------------------------------------------------------------------
+
+local PathfindingService = game:GetService("PathfindingService")
+local Players = game:GetService("Players")
+local function output(func, msg)
+	func(((func == error and "SimplePath Error: ") or "SimplePath: ")..msg)
+end
+local Path = {
+	StatusType = {
+		Idle = "Idle";
+		Active = "Active";
+	};
+	ErrorType = {
+		LimitReached = "LimitReached";
+		TargetUnreachable = "TargetUnreachable";
+		ComputationError = "ComputationError";
+		AgentStuck = "AgentStuck";
+	};
+}
+Path.__index = function(table, index)
+	if index == "Stopped" and not table._humanoid then
+		output(error, "Attempt to use Path.Stopped on a non-humanoid.")
+	end
+	return (table._events[index] and table._events[index].Event)
+		or (index == "LastError" and table._lastError)
+		or (index == "Status" and table._status)
+		or Path[index]
+end
+
+--Used to visualize waypoints
+local visualWaypoint = Instance.new("Part")
+visualWaypoint.Size = Vector3.new(0.3, 0.3, 0.3)
+visualWaypoint.Anchored = true
+visualWaypoint.CanCollide = false
+visualWaypoint.Material = Enum.Material.Neon
+visualWaypoint.Shape = Enum.PartType.Ball
+
+--[[ PRIVATE FUNCTIONS ]]--
+local function declareError(self, errorType)
+	self._lastError = errorType
+	self._events.Error:Fire(errorType)
+end
+
+--Create visual waypoints
+local function createVisualWaypoints(waypoints)
+	local visualWaypoints = {}
+	for _, waypoint in ipairs(waypoints) do
+		local visualWaypointClone = visualWaypoint:Clone()
+		visualWaypointClone.Position = waypoint.Position
+		visualWaypointClone.Parent = workspace
+		visualWaypointClone.Color =
+			(waypoint == waypoints[#waypoints] and Color3.fromRGB(0, 255, 0))
+			or (waypoint.Action == Enum.PathWaypointAction.Jump and Color3.fromRGB(255, 0, 0))
+			or Color3.fromRGB(255, 139, 0)
+		table.insert(visualWaypoints, visualWaypointClone)
+	end
+	return visualWaypoints
+end
+
+--Destroy visual waypoints
+local function destroyVisualWaypoints(waypoints)
+	if waypoints then
+		for _, waypoint in ipairs(waypoints) do
+			waypoint:Destroy()
+		end
+	end
+	return
+end
+
+--Get initial waypoint for non-humanoid
+local function getNonHumanoidWaypoint(self)
+	--Account for multiple waypoints that are sometimes in the same place
+	for i = 2, #self._waypoints do
+		if (self._waypoints[i].Position - self._waypoints[i - 1].Position).Magnitude > 0.1 then
+			return i
+		end
+	end
+	return 2
+end
+
+--Make NPC jump
+local function setJumpState(self)
+	pcall(function()
+		if self._humanoid:GetState() ~= Enum.HumanoidStateType.Jumping and self._humanoid:GetState() ~= Enum.HumanoidStateType.Freefall then
+			self._humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+	end)
+end
+
+--Primary move function
+local function move(self)
+	if self._waypoints[self._currentWaypoint].Action == Enum.PathWaypointAction.Jump then
+		setJumpState(self)
+	end
+	self._humanoid:MoveTo(self._waypoints[self._currentWaypoint].Position)
+end
+
+--Disconnect MoveToFinished connection when pathfinding ends
+local function disconnectMoveConnection(self)
+	self._moveConnection:Disconnect()
+	self._moveConnection = nil
+end
+
+--Fire the WaypointReached event
+local function invokeWaypointReached(self)
+	local lastWaypoint = self._waypoints[self._currentWaypoint - 1]
+	local nextWaypoint = self._waypoints[self._currentWaypoint]
+	self._events.WaypointReached:Fire(self._agent, lastWaypoint, nextWaypoint)
+end
+
+local function moveToFinished(self, reached)
+	
+	--Stop execution if Path is destroyed
+	if not getmetatable(self) then return end
+
+	--Handle case for non-humanoids
+	if not self._humanoid then
+		if reached and self._currentWaypoint + 1 <= #self._waypoints then
+			invokeWaypointReached(self)
+			self._currentWaypoint += 1
+		elseif reached then
+			self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+			self._target = nil
+			self._events.Reached:Fire(self._agent, self._waypoints[self._currentWaypoint])
+		else
+			self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+			self._target = nil
+			declareError(self, self.ErrorType.TargetUnreachable)
+		end
+		return
+	end
+
+	if reached and self._currentWaypoint + 1 <= #self._waypoints  then --Waypoint reached
+		if self._currentWaypoint + 1 < #self._waypoints then
+			invokeWaypointReached(self)
+		end
+		self._currentWaypoint += 1
+		move(self)
+	elseif reached then --Target reached, pathfinding ends
+		disconnectMoveConnection(self)
+		self._status = Path.StatusType.Idle
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+		self._events.Reached:Fire(self._agent, self._waypoints[self._currentWaypoint])
+	else --Target unreachable
+		disconnectMoveConnection(self)
+		self._status = Path.StatusType.Idle
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+		declareError(self, self.ErrorType.TargetUnreachable)
+	end
+end
+
+--Refer to Settings.COMPARISON_CHECKS
+local function comparePosition(self)
+	if self._currentWaypoint == #self._waypoints then return end
+	self._position._count = ((self._agent.PrimaryPart.Position - self._position._last).Magnitude <= 0.07 and (self._position._count + 1)) or 0
+	self._position._last = self._agent.PrimaryPart.Position
+	if self._position._count >= self._settings.COMPARISON_CHECKS then
+		if self._settings.JUMP_WHEN_STUCK then
+			setJumpState(self)
+		end
+		declareError(self, self.ErrorType.AgentStuck)
+	end
+end
+
+--[[ STATIC METHODS ]]--
+function Path.GetNearestCharacter(fromPosition)
+	local character, dist = nil, math.huge
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character and (player.Character.PrimaryPart.Position - fromPosition).Magnitude < dist then
+			character, dist = player.Character, (player.Character.PrimaryPart.Position - fromPosition).Magnitude
+		end
+	end
+	return character
+end
+
+--[[ CONSTRUCTOR ]]--
+function Path.new(agent, agentParameters, override)
+	if not (agent and agent:IsA("Model") and agent.PrimaryPart) then
+		output(error, "Pathfinding agent must be a valid Model Instance with a set PrimaryPart.")
+	end
+
+	local self = setmetatable({
+		_settings = override or DEFAULT_SETTINGS;
+		_events = {
+			Reached = Instance.new("BindableEvent");
+			WaypointReached = Instance.new("BindableEvent");
+			Blocked = Instance.new("BindableEvent");
+			Error = Instance.new("BindableEvent");
+			Stopped = Instance.new("BindableEvent");
+		};
+		_agent = agent;
+		_humanoid = agent:FindFirstChildOfClass("Humanoid");
+		_path = PathfindingService:CreatePath(agentParameters);
+		_status = "Idle";
+		_t = 0;
+		_position = {
+			_last = Vector3.new();
+			_count = 0;
+		};
+	}, Path)
+
+	--Configure settings
+	for setting, value in pairs(DEFAULT_SETTINGS) do
+		self._settings[setting] = self._settings[setting] == nil and value or self._settings[setting]
+	end
+
+	--Path blocked connection
+	self._path.Blocked:Connect(function(...)
+		if (self._currentWaypoint <= ... and self._currentWaypoint + 1 >= ...) and self._humanoid then
+			setJumpState(self)
+			self._events.Blocked:Fire(self._agent, self._waypoints[...])
+		end
+	end)
+
+	return self
+end
+
+
+--[[ NON-STATIC METHODS ]]--
+function Path:Destroy()
+	for _, event in ipairs(self._events) do
+		event:Destroy()
+	end
+	self._events = nil
+	if rawget(self, "_visualWaypoints") then
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+	end
+	self._path:Destroy()
+	setmetatable(self, nil)
+	for k, _ in pairs(self) do
+		self[k] = nil
+	end
+end
+
+function Path:Stop()
+	if not self._humanoid then
+		output(error, "Attempt to call Path:Stop() on a non-humanoid.")
+		return
+	end
+	if self._status == Path.StatusType.Idle then
+		output(function(m)
+			warn(debug.traceback(m))
+		end, "Attempt to run Path:Stop() in idle state")
+		return
+	end
+	disconnectMoveConnection(self)
+	self._status = Path.StatusType.Idle
+	self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+	self._events.Stopped:Fire(self._model)
+end
+
+function Path:Run(target)
+
+	--Non-humanoid handle case
+	if not target and not self._humanoid and self._target then
+		moveToFinished(self, true)
+		return
+	end
+
+	--Parameter check
+	if not (target and (typeof(target) == "Vector3" or target:IsA("BasePart"))) then
+		output(error, "Pathfinding target must be a valid Vector3 or BasePart.")
+	end
+
+	--Refer to Settings.TIME_VARIANCE
+	if os.clock() - self._t <= self._settings.TIME_VARIANCE and self._humanoid then
+		task.wait(os.clock() - self._t)
+		declareError(self, self.ErrorType.LimitReached)
+		return false
+	elseif self._humanoid then
+		self._t = os.clock()
+	end
+
+	--Compute path
+	local pathComputed, _ = pcall(function()
+		self._path:ComputeAsync(self._agent.PrimaryPart.Position, (typeof(target) == "Vector3" and target) or target.Position)
+	end)
+
+	--Make sure path computation is successful
+	if not pathComputed
+		or self._path.Status == Enum.PathStatus.NoPath
+		or #self._path:GetWaypoints() < 2
+		or (self._humanoid and self._humanoid:GetState() == Enum.HumanoidStateType.Freefall) then
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+		task.wait()
+		declareError(self, self.ErrorType.ComputationError)
+		return false
+	end
+
+	--Set status to active; pathfinding starts
+	self._status = (self._humanoid and Path.StatusType.Active) or Path.StatusType.Idle
+	self._target = target
+
+	--Set network owner to server to prevent "hops"
+	pcall(function()
+		self._agent.PrimaryPart:SetNetworkOwner(nil)
+	end)
+
+	--Initialize waypoints
+	self._waypoints = self._path:GetWaypoints()
+	self._currentWaypoint = 2
+
+	--Refer to Settings.COMPARISON_CHECKS
+	if self._humanoid then
+		comparePosition(self)
+	end
+
+	--Visualize waypoints
+	destroyVisualWaypoints(self._visualWaypoints)
+	self._visualWaypoints = (self.Visualize and createVisualWaypoints(self._waypoints))
+
+	--Create a new move connection if it doesn't exist already
+	self._moveConnection = self._humanoid and (self._moveConnection or self._humanoid.MoveToFinished:Connect(function(...)
+		moveToFinished(self, ...)
+	end))
+
+	--Begin pathfinding
+	if self._humanoid then
+		self._humanoid:MoveTo(self._waypoints[self._currentWaypoint].Position)
+	elseif #self._waypoints == 2 then
+		self._target = nil
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+		self._events.Reached:Fire(self._agent, self._waypoints[2])
+	else
+		self._currentWaypoint = getNonHumanoidWaypoint(self)
+		moveToFinished(self, true)
+	end
+	return true
+end
+
+return Path  -  Editar
+  03:13:53.584  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.584  ------------------------------------------  -  Editar
+  03:13:53.584  PATH: Workspace.Characters.Scavenger.AI.__debug  -  Editar
+  03:13:53.584  TYPE: ModuleScript  -  Editar
+  03:13:53.585  ------------------------------------------  -  Editar
+  03:13:53.585  local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
+
+local Storage = ReplicatedStorage:WaitForChild("Storage")
+
+local module = {}
+
+function module:debugLine(p1, p2, dur, color1, color2, line_color)
+	local a = Storage.Miscs.debugObjects.A:Clone()
+	local b = Storage.Miscs.debugObjects.B:Clone()
+	a.Color = color1 or a.Color
+	b.Color = color2 or b.Color
+	a.Beam.Color = line_color and ColorSequence.new(line_color) or a.Beam.Color
+	a.Beam.Attachment0 = a.Attachment
+	a.Beam.Attachment1 = b.Attachment
+	a.Position = p1
+	b.Position = p1 + p2
+	a.Parent = workspace.Ignored
+	b.Parent = workspace.Ignored
+	Debris:AddItem(a, dur or 3)
+	Debris:AddItem(b, dur or 3)
+end
+
+function module:point(p1, dur)
+	local p = Storage.Miscs.debugObjects.Point:Clone()
+	p.CFrame = CFrame.new(p1)
+	p.Parent = workspace.Ignored
+	Debris:AddItem(p, dur or 3)
+end
+
+return module  -  Editar
+  03:13:53.585  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.585  ------------------------------------------  -  Editar
+  03:13:53.585  PATH: Workspace.Characters.Scavenger.AI  -  Editar
+  03:13:53.585  TYPE: Script  -  Editar
+  03:13:53.585  ------------------------------------------  -  Editar
+  03:13:53.585  local character = script.Parent
+local humanoid = character:WaitForChild("Humanoid")
+local animator = humanoid:WaitForChild("Animator")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+local Debris = game:GetService("Debris")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local Debris = game:GetService("Debris")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local ClientStorage = ReplicatedStorage:WaitForChild("Storage")
+local Storage = ServerStorage:WaitForChild("Storage")
+
+local RagdollModule = require(Storage.Modules.Ragdoll)
+local Network = require(ClientStorage.Modules.Network)
+local CombatTag = require(ClientStorage.Modules.CombatTag)
+local CharacterEffects = require(Storage.Modules.CharacterEffects)
+
+local findTargetOverlapParams = OverlapParams.new()
+findTargetOverlapParams.FilterDescendantsInstances = {workspace.Characters}
+findTargetOverlapParams.FilterType = Enum.RaycastFilterType.Whitelist
+
+local config = {
+	characters = workspace.Characters,
+	
+	fov = 95,
+	
+	findTargetRadius = 100,
+	findWanderTargetRadius = 75,
+	findCoverGrid = {
+		[1] = Vector3.new(0, 0, 13),
+		[2] = Vector3.new(-2, 0, 13),
+		[3] = Vector3.new(2, 0, 13),
+		[4] = Vector3.new(4, 0, 13),
+		[5] = Vector3.new(-4, 0, 13),
+		[6] = Vector3.new(-6, 0, 13),
+		[7] = Vector3.new(6, 0, 13),
+		[8] = Vector3.new(8, 0, 13),
+		[9] = Vector3.new(-8, 0, 13),
+		[10] = Vector3.new(10, 0, 13),
+		[11] = Vector3.new(12, 0, 13),
+		[12] = Vector3.new(14, 0, 13),
+		[13] = Vector3.new(-10, 0, 13),
+		[14] = Vector3.new(-12, 0, 13),
+		[15] = Vector3.new(-14, 0, 13),
+		[16] = Vector3.new(-16, 0, 13),
+		[17] = Vector3.new(16, 0, 13)
+	},
+	findCoverDist = 30,
+	
+	states = {
+		{"reload", false},
+		{"aim", false},
+		{"fireActive", 0},
+		{"gunEquipped", false},
+		{"run", false},
+		{"isProne", false},
+		{"isCrouch", false},
+		{"gunEquip", false},
+		{"inspect", false},
+		{"unableToShoot", false},
+		{"meleeEquipped", false},
+		{"meleeAttack", false},
+		{"meleeFinisherAnim", false},
+		{"meleeFinisher", false},
+		{"carry", false},
+		{"finish", false}
+	},
+	
+	aimAccuracy = 2.5,
+	
+	targetOverlapParams = findTargetOverlapParams,
+	targetAlertDuration = 10,
+	forgetTargetOnSightLost = 4,
+	forgetTargetOnFarDistance = 45,
+	
+	fallBackEnemyCountOnFight = 5,
+	stayAlliesCountOnFight = 0,
+	
+	meleeAttackDist = 8,
+	meleeMinCloseDist = 3.5,
+	gunMinCloseFromOriginDist = 30,
+	targetCloseRangeNotice = 25,
+	wanderTargetRandomDist = 50,
+	wanderRandomDist = 5,
+	
+	baseSpeed = 12,
+	runSpeed = 16,
+	
+	weapons = {
+		"NPCAK",
+		"Glock 17",
+		"Tomahawk"
+	},
+	
+	team = "Scavenger",
+	
+	stuckTime = 3,
+	
+	canRespawn = true,
+	respawnTime = 50,
+	
+	debugMode = false,
+	rate = 5 / 25,
+}
+
+local clone
+if config.canRespawn then
+	clone = character:Clone()
+end
+script.Parent = workspace.Terrain
+
+for _,v in pairs(config.states) do
+	character:SetAttribute(v[1], v[2])
+end
+
+humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+
+character:SetAttribute("ActiveAI", true)
+humanoid:SetAttribute("Team", config.team or HttpService:GenerateGUID(false))
+humanoid:SetAttribute("Downed", false)
+humanoid:SetAttribute("Carried", false)
+local downedSFX = ClientStorage.Sounds.downed:Clone()
+downedSFX.Parent = character.Head
+
+local regenScript = ClientStorage.Miscs.Health:Clone()
+regenScript.Parent = character
+regenScript.Enabled = true
+
+local animateScript = ClientStorage.Miscs.Animate:Clone()
+animateScript.Parent = character
+animateScript.Enabled = true
+
+task.wait(1)
+
+local debug = require(script.__debug)
+local path = require(script.__path).new(character, {
+	AgentRadius = 1,
+	AgentCanClimb = true,
+	Costs = {
+		Water = 500,
+		NoPass = math.huge,
+	}
+})
+path.Visualize = config.debugMode
+
+local states = {
+	alertTick = 0,
+	damageAlertTick = 0,
+	targetPart = false,
+	coverDamage = false,
+	run = false,
+}
+
+local equippedTool
+local lastHealth = humanoid.Health
+local lastTargetPos
+local lastTargetAlertPos
+
+local function _disconnectEvents(connections: "Table")
+	for index,event in pairs(connections) do
+		event:Disconnect()
+		connections[index] = nil
+	end
+
+	connections = nil
+end
+
+local backpack = Instance.new("Folder")
+backpack.Name = character.Name .. "_Backpack"
+backpack.Parent = ReplicatedStorage.__tempSTORAGE.npc_backpacks
+
+local activePaths = {}
+local destroyConnections = {}
+local connections = {}
+local function cleanup()
+	pcall(function()
+		path:Destroy()
+		table.clear(activePaths)
+		if character:IsDescendantOf(workspace) then
+			character:Destroy()
+		end
+		
+		if ragdoll then
+			ragdoll:Destroy()
+		end
+		
+		_disconnectEvents(destroyConnections)
+		_disconnectEvents(connections)
+		
+		backpack:Destroy()
+		script:Destroy()
+	end)
+end
+table.insert(destroyConnections, character.Destroying:Connect(cleanup))
+table.insert(destroyConnections, character.AncestryChanged:Connect(function(_,parent)
+	if parent == nil then
+		cleanup()
+	end
+end))
+
+local characterRotation = Instance.new("BodyGyro")
+characterRotation.MaxTorque = Vector3.new(0, 10e5, 0)
+characterRotation.D = 25
+characterRotation.Parent = character
+
+local function getTableIndex(t: "Table")
+	local n = 0
+	for _,_ in pairs(t) do
+		n += 1
+	end
+	
+	return n
+end
+
+function isHumanoid(part: BasePart)
+	if part and part.Parent and part.Parent:FindFirstChild("Humanoid") then
+		return part.Parent
+	elseif part and part.Parent and part.Parent ~= workspace then
+		return isHumanoid(part.Parent)
+	end
+
+	return false
+end
+
+local function isObstacle(p1, p2, params)
+	local cast = workspace:Raycast((typeof(p1) == "Instance" and p1.Position or p1), (typeof(p2) == "Instance" and p2.Position or p2) - (typeof(p1) == "Instance" and p1.Position or p1), params)
+	if config.debugMode then
+		if cast then
+			debug:debugLine((typeof(p1) == "Instance" and p1.Position or p1), cast.Position - (typeof(p1) == "Instance" and p1.Position or p1), 1.5, Color3.fromRGB(0, 255, 0), Color3.fromRGB(0, 255, 0))
+		else
+			debug:debugLine((typeof(p1) == "Instance" and p1.Position or p1), (typeof(p2) == "Instance" and p2.Position or p2) - (typeof(p1) == "Instance" and p1.Position or p1), 1.5, nil, nil, Color3.fromRGB(255, 0, 0))
+		end
+	end
+	
+	return cast
+end
+
+local function getRandomChild(parent)
+	return parent:GetChildren()[math.random(#parent:GetChildren())]
+end
+
+local function getDistance(p1, p2)
+	return ((typeof(p1) == "Instance" and p1.Position or p1) - (typeof(p2) == "Instance" and p2.Position or p2)).magnitude
+end
+
+local function clampDistanceBetweenVectors(V1, V2, Max) -- V1 is origin.
+	return V1 + ((V2 - V1).Unit * math.min((V2 - V1).Magnitude,  Max))
+end
+
+local function angleBetween(vectorA: Vector3, vectorB: Vector3)
+	return math.acos(math.clamp(vectorA:Dot(vectorB), -1, 1))
+end
+
+local function isInFOV(target: BasePart, fov: number)
+	local lookForward = humanoid.RootPart.CFrame.LookVector
+	local lookToPoint = (target.CFrame.Position - humanoid.RootPart.Position).unit
+	local angle = angleBetween(lookForward, lookToPoint)
+	return math.abs(angle) <= math.rad(fov)
+end
+
+local function isGun(tool: Tool)
+	return tool:GetAttribute("Arms") and not tool:GetAttribute("Melee")
+end
+
+local function isMelee(tool: Tool)
+	return tool:GetAttribute("Arms") and tool:GetAttribute("Melee")
+end
+
+local function detectTarget(part: BasePart)
+	return isInFOV(part, config.fov) or getDistance(part, humanoid.RootPart) <= config.targetCloseRangeNotice
+end
+
+local function getTargets(findRadius: number, ignoreObstacles: boolean, ignoreFOV: boolean, isAllies: boolean, includeDeadTarget: boolean)
+	local targets = {}
+	local hitted = {}
+	local collideParts = workspace:GetPartBoundsInRadius(humanoid.RootPart.Position, findRadius, config.targetOverlapParams)
+	for _,part in pairs(collideParts) do
+		local target = isHumanoid(part)
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {character, target or part, workspace.Ignored}
+		if target and target:IsDescendantOf(config.characters) and target ~= character and target:FindFirstChild("Humanoid") and (not target.Humanoid:GetAttribute("Team") or not isAllies and target.Humanoid:GetAttribute("Team") ~= humanoid:GetAttribute("Team") or isAllies and target.Humanoid:GetAttribute("Team") == humanoid:GetAttribute("Team")) and target.Humanoid.RootPart and (target.Humanoid.Health > 0 or includeDeadTarget) and not hitted[target] and part.Parent == target and not target:FindFirstChildWhichIsA("ForceField") and (ignoreObstacles or not isObstacle(humanoid.RootPart, part, params)) and (isInFOV(part, config.fov) or ignoreFOV or getDistance(part, humanoid.RootPart) <= config.targetCloseRangeNotice) then
+			hitted[target] = true
+			targets[#targets + 1] = target
+		end
+	end
+	
+	table.clear(hitted)
+	
+	return targets
+end
+
+local function findClosedTarget(findRadius: number, ignoreObstacles: boolean, ignoreFOV: boolean, isAllies: boolean, includeDeadTarget: boolean)
+	if humanoid.RootPart then
+		local target, dist = nil, math.huge
+		
+		local targets = getTargets(findRadius, ignoreObstacles, ignoreFOV, isAllies, includeDeadTarget)		
+		for _,v in pairs(targets) do
+			local targetDist = getDistance(v.Humanoid.RootPart, humanoid.RootPart)
+			if targetDist < dist then
+				target = v
+				dist = targetDist
+			end
+		end
+		
+		table.clear(targets)
+		
+		return target, dist
+	end
+	
+	return false
+end
+
+local function checkLadder(part: BasePart)
+	local overlapParams = OverlapParams.new()
+	overlapParams.FilterDescendantsInstances = {config.characters, workspace.Ignored}
+	local collideParts = workspace:GetPartBoundsInRadius(part and part.Position or humanoid.RootPart.Position, 3, overlapParams)
+	for _,v in pairs(collideParts) do
+		if v:IsA("TrussPart") then
+			return v
+		end
+	end
+	
+	return false
+end
+
+local function canJump(params: RaycastParams?)
+	return not isObstacle(humanoid.RootPart, humanoid.RootPart.Position + Vector3.new(0, humanoid.JumpPower ^ 2 / (2 * workspace.Gravity), 0), params)
+end
+
+local function unequipTools()
+	for _,v in pairs(character:GetChildren()) do
+		if v:IsA("Tool") then
+			v.Parent = backpack
+		end
+	end
+end
+
+local function equipTool(tool: Tool | string)
+	unequipTools()
+	if typeof(tool) == "Instance" then
+		tool.Parent = character
+	else
+		local backpackTool = backpack:FindFirstChild(tool)
+		if backpackTool then
+			backpackTool.Parent = character
+		end
+	end
+end
+
+local function stopPaths(hash: string)
+	if hash then
+		activePaths[hash] = false
+	else
+		for hash,_ in pairs(activePaths) do
+			activePaths[hash] = false
+		end
+	end
+end
+
+local function moveTo(point: Vector3, timeout: number)
+	task.spawn(function()
+		stopPaths()
+		local hash = HttpService:GenerateGUID(false)
+		activePaths[hash] = true
+
+		local status = {
+			reached = false,
+			blocked = false,
+			error = false,
+
+			skipped = false,
+		}
+
+		local connections = {}
+		table.insert(connections, path.Reached:Connect(function()
+			status.reached = true
+		end))
+
+		table.insert(connections, path.Blocked:Connect(function(_, waypoint)
+			status.blocked = true
+			status.skipped = true
+			
+			humanoid.Jump = true
+		end))
+
+		table.insert(connections, path.Error:Connect(function(errorType)
+			status.error = true
+			status.skipped = true
+			
+			if errorType == "AgentStuck" and humanoid:GetState() ~= Enum.HumanoidStateType.Climbing then
+				humanoid.Jump = true
+			end
+		end))
+		
+		if humanoid.Sit then
+			humanoid.Jump = true
+		end
+
+		if not character:GetAttribute("meleeFinisher") then
+			pcall(function() 
+				local computed = path:Run(point)
+			end)
+		end
+
+		local t = tick()
+		while tick() - t < timeout and not status.reached and not status.skipped and activePaths[hash] do
+			task.wait(config.rate)
+		end
+		
+		_disconnectEvents(connections)
+		table.clear(status)
+		activePaths[hash] = nil
+	end)
+end
+
+local function findCover(fromPart: BasePart, fromPartModel: Model)
+	local coverSpots = {}
+	for _,pos in pairs(config.findCoverGrid) do
+		local origin = (humanoid.RootPart.CFrame * CFrame.new(pos)).p
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {fromPartModel or fromPart, character, workspace.Ignored, config.characters}
+		local cast = workspace:Raycast(origin, fromPart.CFrame.LookVector * -config.findCoverDist, params)
+		if config.debugMode then
+			if cast then
+				debug:debugLine(origin, cast.Position - origin, 0.5)
+			else
+				debug:debugLine(origin, fromPart.CFrame.LookVector * -config.findCoverDist, 0.5, nil, nil, Color3.fromRGB(255, 0, 0))
+			end
+		end
+		
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {character, fromPartModel or fromPart, workspace.Ignored}
+		local addPos = (humanoid.RootPart.CFrame * CFrame.new(Vector3.new(pos.x, 0, 0).unit * 2.5)).p - humanoid.RootPart.Position
+		if cast and isObstacle(fromPart.Position, cast.Position + cast.Normal + addPos, params) then
+			coverSpots[#coverSpots + 1] = {cast, addPos}
+		end
+	end
+	
+	local spot, pos, dist = nil, nil, math.huge
+	for _,v in pairs(coverSpots) do
+		local spotDist = getDistance(v[1].Position, humanoid.RootPart)
+		if spotDist < dist then
+			spot = v[1]
+			pos = v[2]
+			dist = spotDist
+		end
+	end
+	
+	return spot, pos
+end
+
+local function takeCover(jump: boolean, reload: boolean, rush: boolean)
+	if not states.coverDamage and states.target then
+		states.coverDamage = true
+		local cover,pos = findCover(states.target.part, states.target.character)
+		if cover then
+			if rush then
+				states.run = true
+			end
+			local params = RaycastParams.new()
+			params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+			if jump and math.random(2) == 1 and canJump(params) then
+				humanoid.Jump = true
+			end
+			local dist = cover.Position + cover.Normal + pos
+			local timeout = getDistance(dist, humanoid.RootPart) + 0.5
+			moveTo(dist, 1)
+			local t = tick()
+			task.wait(timeout / humanoid.WalkSpeed)
+			local reloaded = false
+			if reload and equippedTool and (not states.target or isObstacle(humanoid.RootPart, states.target.part, params)) then
+				reloaded = true
+				equippedTool.activateEvent:Fire(Enum.KeyCode.R, "began")
+			elseif not reload and (not states.target or isObstacle(humanoid.RootPart, states.target.part, params)) then
+				states.run = false
+			end
+			
+			local strafeTick = 0
+			local strafeSwapTick = 0
+			local strafePos = math.random(1, 2)
+			while tick() - t < 3 do
+				local coverTarget,_ = findClosedTarget(config.findTargetRadius)
+				if coverTarget then
+					if not states.target or states.target.character ~= coverTarget then
+						states.target = {part = coverTarget.Humanoid.RootPart, character = coverTarget}
+						params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+					end
+					if coverTarget.Humanoid:GetAttribute("Downed") then
+						break
+					end
+					local params = RaycastParams.new()
+					params.FilterDescendantsInstances = {character, coverTarget, workspace.Ignored}
+					if getDistance(coverTarget.Humanoid.RootPart, humanoid.RootPart) > 5 and not isObstacle(humanoid.RootPart, coverTarget.Humanoid.RootPart, params) then
+						local cover,pos = findCover(coverTarget.Humanoid.RootPart, coverTarget)
+						if cover then
+							local dist = cover.Position + cover.Normal + pos
+							local timeout = getDistance(dist, humanoid.RootPart) + 0.5
+							if config.debugMode then
+								debug:point(dist, 1.5)
+							end
+							moveTo(dist, 1)
+							task.wait(timeout / humanoid.WalkSpeed)
+							if reload and equippedTool and not reloaded and (not coverTarget:IsDescendantOf(workspace) or not coverTarget.Humanoid.RootPart or isObstacle(humanoid.RootPart, coverTarget.Humanoid.RootPart, params)) then
+								equippedTool.activateEvent:Fire(Enum.KeyCode.R, "began")
+								states.run = false
+							elseif not reload and (not coverTarget:IsDescendantOf(workspace) or not coverTarget.Humanoid.RootPart or isObstacle(humanoid.RootPart, coverTarget.Humanoid.RootPart, params)) then
+								states.run = false
+							end
+							t = tick()
+						else
+							moveTo(clampDistanceBetweenVectors(coverTarget.Humanoid.RootPart.Position, humanoid.RootPart.Position, 20), 1)
+						end
+					else
+						if canJump(params) and math.random(5) == 1 then
+							humanoid.Jump = true
+						end
+						moveTo(clampDistanceBetweenVectors(coverTarget.Humanoid.RootPart.Position, humanoid.RootPart.Position, 20), 1)
+					end
+				else
+					local strafeDir = {
+						humanoid.RootPart.CFrame.RightVector * 5, 
+						humanoid.RootPart.CFrame.RightVector * -5,
+					}
+
+					if tick() - strafeTick >= 0.5 and not character:GetAttribute("meleeFinisher") then
+						strafeTick = tick()
+						humanoid:MoveTo(humanoid.RootPart.Position + strafeDir[math.random(#strafeDir)] + strafeDir[strafePos])
+						if tick() - strafeSwapTick >= 3 then
+							strafeSwapTick = tick()
+							strafePos = math.random(1, 2)
+						end
+					end
+				end
+
+				task.wait(config.rate)
+			end
+		else
+			moveTo(clampDistanceBetweenVectors(states.target.part.Position, humanoid.RootPart.Position, 100), 1)
+			if reload and equippedTool then
+				equippedTool.activateEvent:Fire(Enum.KeyCode.R, "began")
+			end
+		end
+		states.coverDamage = false
+	elseif reload and equippedTool then
+		equippedTool.activateEvent:Fire(Enum.KeyCode.R, "began")
+	end
+end
+
+local function enemy()
+	local target,_ = findClosedTarget(config.findTargetRadius, false, tick() - states.damageAlertTick < 0.5)
+	if target then
+		states.alertTick = tick()
+		stopPaths()
+		states.target = {part = target.Humanoid.RootPart, character = target}
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+		local takeCoverFast = getDistance(states.target.part, humanoid.RootPart) <= 15 and (not equippedTool or isGun(equippedTool))
+		if math.random(2) == 1 or takeCoverFast or #getTargets(config.findTargetRadius * 1.5) >= config.fallBackEnemyCountOnFight and #getTargets(config.findTargetRadius, false, true, true) < config.stayAlliesCountOnFight then
+			if not target.Humanoid:GetAttribute("Downed") then
+				takeCover(false, false, takeCoverFast and true)
+			end
+		end
+		local onSightTick = tick()
+		
+		local strafeTick = 0
+		local strafeSwapTick = 0
+		local strafePos = math.random(1, 2)
+		
+		local lastSeenPosition = states.target.part.Position
+		local lostSightRadius = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
+		character:SetAttribute("aim", true)
+		lastTargetAlertPos = states.target.part.Position
+		local originRootPos = humanoid.RootPart.Position
+		if equippedTool and isMelee(equippedTool) then
+			states.run = true
+		end
+		while target:IsDescendantOf(workspace) and target.Humanoid.Health > 0 and target.Humanoid.RootPart and getDistance(target.Humanoid.RootPart, humanoid.RootPart) < config.forgetTargetOnFarDistance do
+			local onSight = not isObstacle(humanoid.RootPart, states.target.part, params)
+			if onSight and detectTarget(states.target.part) or checkLadder() then
+				onSightTick = tick()
+				lastSeenPosition = states.target.part.Position
+				lostSightRadius = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
+			elseif tick() - onSightTick >= config.forgetTargetOnSightLost then
+				lastTargetPos = lastSeenPosition
+				lastTargetAlertPos = lastSeenPosition
+				break
+			--[[elseif not onSight and target.Humanoid.Health > 50 and equippedTool and isGun(equippedTool) then
+				takeCover(false, false, true)]]
+			end
+			
+			if math.random(5) == 1 and not states.target.character.Humanoid:GetAttribute("Downed") and #getTargets(config.findTargetRadius) >= config.fallBackEnemyCountOnFight and #getTargets(config.findTargetRadius, false, true, true) < config.stayAlliesCountOnFight or humanoid:GetAttribute("Downed") then
+				takeCover(false, false, true)
+			end
+			
+			if equippedTool and isGun(equippedTool) and not states.target.character.Humanoid:GetAttribute("Downed") and ((equippedTool._data.magCurrent.Value / equippedTool._data.magSize.Value) * 1 <= 0.3 and math.random(3) == 1 or equippedTool._data.magCurrent.Value <= 0) and equippedTool._data.ammo.Value > 0 then
+				takeCover(false, true, true)
+			end
+			
+			local otherCloserTarget,_ = findClosedTarget(config.findTargetRadius)
+			if otherCloserTarget and otherCloserTarget ~= target then
+				target = otherCloserTarget
+				states.target = {part = target.Humanoid.RootPart, character = target}
+				params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+				originRootPos = humanoid.RootPart.Position
+			end
+			
+			local ladderPart = checkLadder()
+			local targetIsClimbing = checkLadder(states.target.part) == ladderPart and ladderPart ~= false
+			if targetIsClimbing then
+				moveTo(ladderPart.Position + Vector3.new(0, ladderPart.Size.y / 2, 0), 1)
+			else
+				if equippedTool and isGun(equippedTool) then
+					local strafeDir = {
+						humanoid.RootPart.CFrame.RightVector * 5, 
+						humanoid.RootPart.CFrame.RightVector * -5,
+					}
+					
+					if getDistance(originRootPos, lastSeenPosition) < config.gunMinCloseFromOriginDist then
+						if onSight then
+							moveTo(clampDistanceBetweenVectors(lastSeenPosition + strafeDir[math.random(#strafeDir)], originRootPos, config.gunMinCloseFromOriginDist), 1)
+						else
+							moveTo(lastSeenPosition + lostSightRadius + strafeDir[math.random(#strafeDir)], 1)
+						end
+					elseif tick() - strafeTick >= 0.5 and not character:GetAttribute("meleeFinisher") then
+						strafeTick = tick()
+						humanoid:MoveTo(humanoid.RootPart.Position + strafeDir[math.random(#strafeDir)] + strafeDir[strafePos])
+						if tick() - strafeSwapTick >= 3 then
+							strafeSwapTick = tick()
+							strafePos = math.random(1, 2)
+						end
+					end
+				elseif equippedTool and isMelee(equippedTool) then
+					moveTo(onSight and clampDistanceBetweenVectors(lastSeenPosition, humanoid.RootPart.Position, config.meleeMinCloseDist) or lastSeenPosition + lostSightRadius, 1)
+				else
+					moveTo(onSight and lastSeenPosition or lastSeenPosition + lostSightRadius, 1)
+				end
+			end
+			while states.coverDamage do
+				if target:IsDescendantOf(workspace) and target.Humanoid.Health > 0 and target.Humanoid.RootPart and not isObstacle(humanoid.RootPart, states.target.part, params) then
+					onSightTick = tick()
+				end
+				task.wait(config.rate * 2)
+			end
+			if states.target and target ~= states.target.character then
+				target = states.target.character
+			end
+			
+			local waitTime = checkLadder() and humanoid:GetState() == Enum.HumanoidStateType.Climbing and math.max(getDistance(lastSeenPosition, humanoid.RootPart) / 40, 3) or ladderPart and 1 or config.rate
+			if waitTime <= config.rate then
+				task.wait(config.rate)
+			else
+				local t = tick()
+				while tick() - t < waitTime do
+					if getDistance(lastSeenPosition, humanoid.RootPart) <= 1 then
+						break
+					end
+					if states.target.part.Position.y < humanoid.RootPart.Position.y - 5 and not isObstacle(humanoid.RootPart, states.target.part, params) then
+						humanoid.Jump = true
+						task.wait()
+						break
+					end
+					task.wait(config.rate)
+				end
+			end
+		end
+		
+		character:SetAttribute("aim", false)
+		table.clear(states.target)
+		states.target = false
+		states.run = false
+		return true
+	else
+		if typeof(states.target) == "table" then
+			table.clear(states.target)
+		end
+		states.target = false
+	end
+	
+	return false
+end
+
+local function loadAnim(id)
+	local animTrack = Instance.new("Animation")
+	animTrack.AnimationId = "rbxassetid://" .. id
+	return animator:LoadAnimation(animTrack),
+		animTrack:Destroy()
+end
+
+local downed_anim = {
+	idle = loadAnim(15509088751),
+	move = loadAnim(15509089692)
+}
+
+local runAnim = loadAnim(15509088120)
+runAnim.Priority = Enum.AnimationPriority.Idle
+
+table.insert(connections, humanoid.HealthChanged:Connect(function(hp)
+	local damage = lastHealth - hp
+	if hp > 5 and (hp / humanoid.MaxHealth) * 100 < 15 and not humanoid:GetAttribute("Downed") and damage < 80 then
+		humanoid:SetAttribute("RagdollDur", 2.5)
+		humanoid:SetAttribute("Ragdoll", true)
+		humanoid:SetAttribute("Downed", true)
+	end
+	
+	if damage > 0 then
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = {workspace.Ignored, workspace.Characters}
+		if math.random(3) == 1 and canJump(params) then
+			humanoid.Jump = true
+		end 
+		states.run = true
+		task.delay(math.random(10, 25) / 10, function()
+			states.run = false
+		end)
+		states.damageAlertTick = tick()
+		takeCover(true)
+	end
+
+	lastHealth = humanoid.Health
+end))
+
+local jumpPower = humanoid.JumpPower
+table.insert(connections, humanoid:GetAttributeChangedSignal("Downed"):Connect(function()
+	local downed = humanoid:GetAttribute("Downed")
+	if downed then
+		humanoid.Health = humanoid.MaxHealth
+		humanoid.WalkSpeed = 2
+		humanoid.HipHeight = -2
+		humanoid.JumpPower = 0
+	else
+		humanoid.Health = 30
+		humanoid.WalkSpeed = game:GetService("StarterPlayer").CharacterWalkSpeed
+		humanoid.HipHeight = 0
+		downedSFX:Stop()
+		humanoid.JumpPower = jumpPower
+	end
+
+	local torso = character:FindFirstChild("Torso")
+	if torso then
+		torso.CollisionGroup = downed and "NoCollisions" or (humanoid.Health > 0 and "Alive" or "Death")
+	end
+
+	if humanoid.RootPart then
+		humanoid.RootPart.CanCollide = downed
+	end
+end))
+
+for _,p in pairs(character:GetChildren()) do
+	if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+		p.CollisionGroup = "Alive"
+	elseif p.Name == "HumanoidRootPart" then
+		p.CollisionGroup = "CollisionNoRaycast"
+	end
+end
+
+table.insert(connections, humanoid.Died:Connect(function()
+	downedSFX:Stop()
+	for _,p in pairs(character:GetChildren()) do
+		if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+			p.CollisionGroup = "Death"
+		elseif p.Name == "HumanoidRootPart" then
+			p.CollisionGroup = "CollisionNoRaycast"
+		end
+	end
+
+	if character:FindFirstChild("Head") then
+		for _,sound in pairs(character.Head:GetChildren()) do
+			if sound.Name == "hurt" then
+				sound:Destroy()
+			end
+		end
+	end
+
+	if humanoid.RootPart then
+		Network:FireAllClients("client", "createSound", getRandomChild(ClientStorage.Sounds.died), humanoid.RootPart)
+		humanoid.RootPart.CanCollide = false
+		local deadLight = ClientStorage.Miscs.deadLight:Clone()
+		deadLight.Parent = humanoid.RootPart
+	end
+
+	local killer, damage, weapon = CombatTag:getKiller(character)
+	if killer and Players:FindFirstChild(killer) then
+		Network:FireClient(Players[killer], "client", "killFX", character.Name, weapon)
+		ClientStorage.Events.kill:Fire(Players[killer], "dummy")
+	end
+
+	if config.canRespawn then
+		task.wait(config.respawnTime)
+		clone.Parent = character.Parent
+		cleanup()
+	end
+end))
+
+for _,v in pairs(script.Parent:GetDescendants()) do
+	if (v:IsA("BasePart") and (v.Parent:IsA("Accessory") or v.Parent.Parent:IsA("Accessory"))) then
+		v.CollisionGroup = "Debris"
+	elseif(v:IsA("CharacterMesh")) then
+		v:Destroy()
+	end
+end
+
+ragdoll = RagdollModule.create(character, true)
+ragdoll:registerEvent()
+table.insert(connections, humanoid:GetAttributeChangedSignal("Ragdoll"):Connect(function()
+	local state = humanoid:GetAttribute("Ragdoll")
+	ragdoll:set(state)
+	if not state and humanoid:GetAttribute("Downed") then
+		downedSFX:Play()
+	end
+
+	local downed = humanoid:GetAttribute("Downed")
+	local torso = character:FindFirstChild("Torso")
+	if torso then
+		if downed and humanoid:GetAttribute("Ragdoll") then
+			torso.CollisionGroup = humanoid.Health > 0 and "Alive" or "Death"
+		elseif downed and not humanoid:GetAttribute("Ragdoll") then
+			torso.CollisionGroup = "NoCollisionsRaycast"
+		end
+	end
+end))
+CharacterEffects:createEffects(humanoid)
+
+local function isMoving()
+	return humanoid.RootPart and Vector3.new(humanoid.RootPart.Velocity.x, 0, humanoid.RootPart.Velocity.z).magnitude > 0.1
+end
+
+local characterSpeed = humanoid.WalkSpeed
+table.insert(connections, humanoid.Running:Connect(function(speed)
+	characterSpeed = speed
+end))
+
+for _,weaponName in pairs(config.weapons) do
+	ClientStorage.Events.giveTool:Invoke(weaponName, backpack)
+end
+task.delay(1, function()
+	equipTool("NPCAK")
+end)
+
+local toolActivated = false
+local clientUpdateTime = 0 
+local stuckHeat = tick()
+task.spawn(function()
+	local lastLookPos
+	while humanoid.RootPart and humanoid.RootPart:IsDescendantOf(workspace) do
+		local isAlert = tick() - states.alertTick <= config.targetAlertDuration
+		if states.target and not humanoid:GetAttribute("Downed") then
+			if not lastLookPos then
+				lastLookPos = states.target.part.Position + (states.target.part.CFrame.UpVector * 2.5)
+			end
+			characterRotation.CFrame = CFrame.new(humanoid.RootPart.Position, (lastLookPos - humanoid.RootPart.Position).unit * 10000)
+		elseif humanoid:GetAttribute("Downed") and isMoving() then
+			characterRotation.CFrame = CFrame.new(Vector3.new(humanoid.RootPart.Position.x, humanoid.RootPart.Position.y + 75, humanoid.RootPart.Position.z), Vector3.new(humanoid.RootPart.Position.x, humanoid.RootPart.Position.y - 75, humanoid.RootPart.Position.z) + ((humanoid.RootPart.Velocity * Vector3.new(1, 0, 1)).unit * -50))
+		elseif not states.target and isAlert and lastTargetAlertPos then
+			characterRotation.CFrame = CFrame.new(humanoid.RootPart.Position, (lastTargetAlertPos - humanoid.RootPart.Position).unit * 10000)
+		end
+		
+		if not isAlert and lastTargetAlertPos then
+			lastTargetAlertPos = nil
+		end
+		
+		local params
+		if states.target then
+			params = RaycastParams.new()
+			params.FilterDescendantsInstances = {character, states.target.character, workspace.Ignored}
+		end
+		local targetSightBlocked = states.target and isObstacle(humanoid.RootPart, states.target.part, params)
+		local ladderPart = checkLadder()
+		if states.target and not targetSightBlocked and detectTarget(states.target.part) and not ladderPart then
+			lastLookPos = states.target.part.Position
+		elseif ladderPart then
+			lastLookPos = ladderPart.Position
+		end
+		if (states.target or ladderPart or humanoid:GetAttribute("Downed") or isAlert) and not humanoid:GetAttribute("Ragdoll") and not humanoid:GetAttribute("Carried") then
+			characterRotation.Parent = humanoid.RootPart
+		else
+			characterRotation.Parent = nil
+		end
+		
+		local vel = humanoid.RootPart and Vector3.new(humanoid.RootPart.Velocity.x, 0, humanoid.RootPart.Velocity.z).magnitude or 0
+		local forward = humanoid.RootPart and humanoid.MoveDirection:Dot(humanoid.RootPart.CFrame.LookVector) > -0.1
+		local animUnit = 1
+		if not forward then
+			animUnit = -1
+		end
+		
+		if humanoid:GetAttribute("Downed") and not humanoid:GetAttribute("Carried") then
+			if not downed_anim.idle.IsPlaying and (not isMoving() or humanoid.WalkSpeed <= 0) then
+				downed_anim.idle:Play()
+			elseif not downed_anim.move.IsPlaying and isMoving() and humanoid.WalkSpeed > 0 then
+				downed_anim.move:Play()
+				downed_anim.idle:Stop()
+			elseif downed_anim.move.IsPlaying then
+				if humanoid.WalkSpeed > 0 then	
+					downed_anim.move:AdjustSpeed((vel / 1.8) * animUnit)
+				else
+					downed_anim.move:Stop(0.5)
+				end
+			end
+		elseif downed_anim.idle.IsPlaying or downed_anim.move.IsPlaying then
+			downed_anim.idle:Stop()
+			downed_anim.move:Stop()
+		end
+		
+		local justFired = tick() - character:GetAttribute("fireActive") < (1 / 10)
+		humanoid.AutoRotate = not states.target and not humanoid:GetAttribute("Ragdoll") and not humanoid:GetAttribute("Downed")
+		if not character:GetAttribute("meleeFinisher") then
+			humanoid.WalkSpeed = humanoid:GetAttribute("Downed") and 2 or (character:GetAttribute("reload") or justFired) and 5 or states.run and config.runSpeed or config.baseSpeed
+		end
+		--humanoid.WalkSpeed = (revive or carry_db) and 0 or downed and ((_G.reload or tick() - _G.fireActive <= 1) and 0 or 2) or _G.isProne and 3 or (_G.reload or _G.foodUse or justFired or _G.isCrouch) and 5 or _G.aim and not _G.grenadeUse and 7 or _G.grenadeUse and 9 or game:GetService("StarterPlayer").CharacterWalkSpeed
+		local vel = humanoid.RootPart.AssemblyLinearVelocity.magnitude
+		if vel > 0.1 then
+			stuckHeat = tick()
+		elseif getTableIndex(activePaths) > 0 and tick() - stuckHeat >= config.stuckTime then
+			stopPaths()
+			local points = {
+				humanoid.RootPart.CFrame.LookVector,
+				-humanoid.RootPart.CFrame.LookVector,
+				humanoid.RootPart.CFrame.RightVector,
+				-humanoid.RootPart.CFrame.RightVector
+			}
+			local unstuckPos = Vector3.new()
+			local params = RaycastParams.new()
+			params.FilterDescendantsInstances = {character, config.characters, workspace.Ignored}
+			for _,p in pairs(points) do
+				local cast = workspace:Raycast(humanoid.RootPart.Position - (humanoid.RootPart.CFrame.UpVector * -2.5), p.unit * 1.5, params)
+				if not cast then
+					unstuckPos += p.unit * 5
+				end
+			end
+			
+			if unstuckPos.magnitude <= 0 then
+				unstuckPos += Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
+			end
+			if not character:GetAttribute("meleeFinisher") then
+				humanoid:MoveTo(humanoid.RootPart.Position + unstuckPos)
+			end
+			if not canJump(params) then
+				humanoid.Jump = true
+			end
+		end
+		
+		if states.run and isMoving() and not character:GetAttribute("reload") then
+			if not runAnim.IsPlaying then
+				runAnim:Play(0.3)
+			end
+		else
+			runAnim:Stop()
+		end
+		
+		if runAnim.IsPlaying then
+			runAnim:AdjustSpeed((characterSpeed / 19.5) * animUnit)
+		end
+		
+		if humanoid:GetState() ~= Enum.HumanoidStateType.Running and states.run then
+			if runAnim.IsPlaying then
+				runAnim:Stop()
+			end
+		elseif states.run and not runAnim.IsPlaying and isMoving() then
+			runAnim:Play(0.3)
+		end
+		
+		if character:GetAttribute("reload") then
+			states.run = false
+		end
+		
+		local tool = character:FindFirstChildWhichIsA("Tool")
+		if tool and tool:FindFirstChild("activateEvent") then
+			if states.target then
+				tool:SetAttribute("AimDir", (states.target.part.Position - character.Head.Position) 
+					+ (Vector3.new(
+						math.random(-100, 100),
+						math.random(-100, 100),
+						math.random(-100, 100)
+						) / 100) * config.aimAccuracy
+				)
+			end
+			
+			if states.target and detectTarget(states.target.part) and not targetSightBlocked then
+				if isGun(tool) and tool._data.magCurrent.Value > 0 and not character:GetAttribute("reload") and not toolActivated then
+					toolActivated = true
+					tool.activateEvent:Fire(Enum.UserInputType.MouseButton1, "began")
+					task.delay(math.clamp(15 / getDistance(states.target.part, humanoid.RootPart), 0.15, 0.8), function()
+						if tool:IsDescendantOf(character) then
+							tool.activateEvent:Fire(Enum.UserInputType.MouseButton1, "ended")
+						end
+						task.wait(math.random(5, 10) / 10)
+						toolActivated = false
+					end)
+				elseif isMelee(tool) and not toolActivated and (getDistance(states.target.part, humanoid.RootPart.Position + (humanoid.RootPart.AssemblyLinearVelocity / 2)) <= config.meleeAttackDist or tick() - states.damageAlertTick < 0.5 and math.random(2) == 1 and getDistance(states.target.part, humanoid.RootPart.Position) <= config.meleeAttackDist + 2) then
+					if states.target.character.Humanoid:GetAttribute("Downed") and math.random(2) == 1 and getDistance(states.target.part, humanoid.RootPart.Position) <= config.meleeMinCloseDist + 2 then
+						toolActivated = true
+						tool.activateEvent:Fire(states.target.character, "finisher")
+						toolActivated = false
+					elseif math.random(2) == 1 then
+						toolActivated = true
+						tool.activateEvent:Fire(Enum.UserInputType.MouseButton1, "began")
+						task.delay(1 / 30, function()
+							if tool:IsDescendantOf(character) then
+								tool.activateEvent:Fire(Enum.UserInputType.MouseButton1, "ended")
+							end
+							toolActivated = false
+						end)
+					end
+				end
+			end
+			
+			equippedTool = tool
+		else
+			equippedTool = nil
+		end
+		
+		if tick() - clientUpdateTime >= 1 / 10 and lastLookPos then
+			clientUpdateTime = tick()
+
+			Network:FireAllClients("client", "updates", character, {
+				mouseOrigin = humanoid.RootPart.Position,
+				mouseDir = states.target and lastLookPos or (humanoid.RootPart.Position + humanoid.RootPart.CFrame.LookVector * 10),
+				cameraCF = states.target and CFrame.new(character.Head.Position, lastLookPos) or CFrame.new(character.Head.Position, character.Head.Position + (character.Head.CFrame.LookVector * 10)),
+				neckAngle = character:GetAttribute("aim") and equippedTool and isGun(equippedTool) and -30 or 0,
+			})
+		end
+		
+		task.wait(config.rate)
+	end
+	
+	cleanup()
+end)
+
+while humanoid.RootPart do
+	if tick() - states.alertTick >= config.targetAlertDuration or not findClosedTarget(config.findTargetRadius) then
+		local wanderTarget,_ = findClosedTarget(config.findWanderTargetRadius, true)
+		if wanderTarget then
+			if lastTargetPos then
+				moveTo(clampDistanceBetweenVectors(lastTargetPos, humanoid.RootPart.Position, 80), 3)
+				lastTargetPos = nil
+			else
+				moveTo(wanderTarget.Humanoid.RootPart.Position + Vector3.new(math.random(-config.wanderTargetRandomDist, config.wanderTargetRandomDist), 0, math.random(-config.wanderTargetRandomDist, config.wanderTargetRandomDist)), math.random(5, 10))
+			end
+		else
+			if math.random(5) == 1 and not lastTargetPos then
+				moveTo(Vector3.new(math.random(-config.wanderRandomDist, config.wanderRandomDist), 0, math.random(-config.wanderRandomDist, config.wanderRandomDist)), math.random(5, 10))
+			elseif lastTargetPos then
+				moveTo(clampDistanceBetweenVectors(lastTargetPos, humanoid.RootPart.Position, 80), 3)
+				lastTargetPos = nil
+			end
+		end
+		
+		while getTableIndex(activePaths) > 0 do
+			enemy()
+			task.wait(config.rate)
+		end
+	else
+		enemy()
+	end
+	
+	task.wait(config.rate)
+end  -  Editar
+  03:13:53.585  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.585  ------------------------------------------  -  Editar
+  03:13:53.585  PATH: Workspace.Characters.Scavenger.AI.__path  -  Editar
+  03:13:53.585  TYPE: ModuleScript  -  Editar
+  03:13:53.585  ------------------------------------------  -  Editar
+  03:13:53.586  --[[
+-------------------------------------------------------------------
+
+Created by: @V3N0M_Z
+Reference: https://v3n0m-z.github.io/RBLX-SimplePath/
+License: MIT
+
+---------------------------------------------------------------------
+]]
+
+local DEFAULT_SETTINGS = {
+
+	TIME_VARIANCE = 0.07;
+
+	COMPARISON_CHECKS = 3;
+
+	JUMP_WHEN_STUCK = false;
+}
+
+---------------------------------------------------------------------
+
+local PathfindingService = game:GetService("PathfindingService")
+local Players = game:GetService("Players")
+local function output(func, msg)
+	func(((func == error and "SimplePath Error: ") or "SimplePath: ")..msg)
+end
+local Path = {
+	StatusType = {
+		Idle = "Idle";
+		Active = "Active";
+	};
+	ErrorType = {
+		LimitReached = "LimitReached";
+		TargetUnreachable = "TargetUnreachable";
+		ComputationError = "ComputationError";
+		AgentStuck = "AgentStuck";
+	};
+}
+Path.__index = function(table, index)
+	if index == "Stopped" and not table._humanoid then
+		output(error, "Attempt to use Path.Stopped on a non-humanoid.")
+	end
+	return (table._events[index] and table._events[index].Event)
+		or (index == "LastError" and table._lastError)
+		or (index == "Status" and table._status)
+		or Path[index]
+end
+
+--Used to visualize waypoints
+local visualWaypoint = Instance.new("Part")
+visualWaypoint.Size = Vector3.new(0.3, 0.3, 0.3)
+visualWaypoint.Anchored = true
+visualWaypoint.CanCollide = false
+visualWaypoint.Material = Enum.Material.Neon
+visualWaypoint.Shape = Enum.PartType.Ball
+
+--[[ PRIVATE FUNCTIONS ]]--
+local function declareError(self, errorType)
+	self._lastError = errorType
+	self._events.Error:Fire(errorType)
+end
+
+--Create visual waypoints
+local function createVisualWaypoints(waypoints)
+	local visualWaypoints = {}
+	for _, waypoint in ipairs(waypoints) do
+		local visualWaypointClone = visualWaypoint:Clone()
+		visualWaypointClone.Position = waypoint.Position
+		visualWaypointClone.Parent = workspace
+		visualWaypointClone.Color =
+			(waypoint == waypoints[#waypoints] and Color3.fromRGB(0, 255, 0))
+			or (waypoint.Action == Enum.PathWaypointAction.Jump and Color3.fromRGB(255, 0, 0))
+			or Color3.fromRGB(255, 139, 0)
+		table.insert(visualWaypoints, visualWaypointClone)
+	end
+	return visualWaypoints
+end
+
+--Destroy visual waypoints
+local function destroyVisualWaypoints(waypoints)
+	if waypoints then
+		for _, waypoint in ipairs(waypoints) do
+			waypoint:Destroy()
+		end
+	end
+	return
+end
+
+--Get initial waypoint for non-humanoid
+local function getNonHumanoidWaypoint(self)
+	--Account for multiple waypoints that are sometimes in the same place
+	for i = 2, #self._waypoints do
+		if (self._waypoints[i].Position - self._waypoints[i - 1].Position).Magnitude > 0.1 then
+			return i
+		end
+	end
+	return 2
+end
+
+--Make NPC jump
+local function setJumpState(self)
+	pcall(function()
+		if self._humanoid:GetState() ~= Enum.HumanoidStateType.Jumping and self._humanoid:GetState() ~= Enum.HumanoidStateType.Freefall then
+			self._humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+	end)
+end
+
+--Primary move function
+local function move(self)
+	if self._waypoints[self._currentWaypoint].Action == Enum.PathWaypointAction.Jump then
+		setJumpState(self)
+	end
+	self._humanoid:MoveTo(self._waypoints[self._currentWaypoint].Position)
+end
+
+--Disconnect MoveToFinished connection when pathfinding ends
+local function disconnectMoveConnection(self)
+	self._moveConnection:Disconnect()
+	self._moveConnection = nil
+end
+
+--Fire the WaypointReached event
+local function invokeWaypointReached(self)
+	local lastWaypoint = self._waypoints[self._currentWaypoint - 1]
+	local nextWaypoint = self._waypoints[self._currentWaypoint]
+	self._events.WaypointReached:Fire(self._agent, lastWaypoint, nextWaypoint)
+end
+
+local function moveToFinished(self, reached)
+	
+	--Stop execution if Path is destroyed
+	if not getmetatable(self) then return end
+
+	--Handle case for non-humanoids
+	if not self._humanoid then
+		if reached and self._currentWaypoint + 1 <= #self._waypoints then
+			invokeWaypointReached(self)
+			self._currentWaypoint += 1
+		elseif reached then
+			self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+			self._target = nil
+			self._events.Reached:Fire(self._agent, self._waypoints[self._currentWaypoint])
+		else
+			self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+			self._target = nil
+			declareError(self, self.ErrorType.TargetUnreachable)
+		end
+		return
+	end
+
+	if reached and self._currentWaypoint + 1 <= #self._waypoints  then --Waypoint reached
+		if self._currentWaypoint + 1 < #self._waypoints then
+			invokeWaypointReached(self)
+		end
+		self._currentWaypoint += 1
+		move(self)
+	elseif reached then --Target reached, pathfinding ends
+		disconnectMoveConnection(self)
+		self._status = Path.StatusType.Idle
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+		self._events.Reached:Fire(self._agent, self._waypoints[self._currentWaypoint])
+	else --Target unreachable
+		disconnectMoveConnection(self)
+		self._status = Path.StatusType.Idle
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+		declareError(self, self.ErrorType.TargetUnreachable)
+	end
+end
+
+--Refer to Settings.COMPARISON_CHECKS
+local function comparePosition(self)
+	if self._currentWaypoint == #self._waypoints then return end
+	self._position._count = ((self._agent.PrimaryPart.Position - self._position._last).Magnitude <= 0.07 and (self._position._count + 1)) or 0
+	self._position._last = self._agent.PrimaryPart.Position
+	if self._position._count >= self._settings.COMPARISON_CHECKS then
+		if self._settings.JUMP_WHEN_STUCK then
+			setJumpState(self)
+		end
+		declareError(self, self.ErrorType.AgentStuck)
+	end
+end
+
+--[[ STATIC METHODS ]]--
+function Path.GetNearestCharacter(fromPosition)
+	local character, dist = nil, math.huge
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character and (player.Character.PrimaryPart.Position - fromPosition).Magnitude < dist then
+			character, dist = player.Character, (player.Character.PrimaryPart.Position - fromPosition).Magnitude
+		end
+	end
+	return character
+end
+
+--[[ CONSTRUCTOR ]]--
+function Path.new(agent, agentParameters, override)
+	if not (agent and agent:IsA("Model") and agent.PrimaryPart) then
+		output(error, "Pathfinding agent must be a valid Model Instance with a set PrimaryPart.")
+	end
+
+	local self = setmetatable({
+		_settings = override or DEFAULT_SETTINGS;
+		_events = {
+			Reached = Instance.new("BindableEvent");
+			WaypointReached = Instance.new("BindableEvent");
+			Blocked = Instance.new("BindableEvent");
+			Error = Instance.new("BindableEvent");
+			Stopped = Instance.new("BindableEvent");
+		};
+		_agent = agent;
+		_humanoid = agent:FindFirstChildOfClass("Humanoid");
+		_path = PathfindingService:CreatePath(agentParameters);
+		_status = "Idle";
+		_t = 0;
+		_position = {
+			_last = Vector3.new();
+			_count = 0;
+		};
+	}, Path)
+
+	--Configure settings
+	for setting, value in pairs(DEFAULT_SETTINGS) do
+		self._settings[setting] = self._settings[setting] == nil and value or self._settings[setting]
+	end
+
+	--Path blocked connection
+	self._path.Blocked:Connect(function(...)
+		if (self._currentWaypoint <= ... and self._currentWaypoint + 1 >= ...) and self._humanoid then
+			setJumpState(self)
+			self._events.Blocked:Fire(self._agent, self._waypoints[...])
+		end
+	end)
+
+	return self
+end
+
+
+--[[ NON-STATIC METHODS ]]--
+function Path:Destroy()
+	for _, event in ipairs(self._events) do
+		event:Destroy()
+	end
+	self._events = nil
+	if rawget(self, "_visualWaypoints") then
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+	end
+	self._path:Destroy()
+	setmetatable(self, nil)
+	for k, _ in pairs(self) do
+		self[k] = nil
+	end
+end
+
+function Path:Stop()
+	if not self._humanoid then
+		output(error, "Attempt to call Path:Stop() on a non-humanoid.")
+		return
+	end
+	if self._status == Path.StatusType.Idle then
+		output(function(m)
+			warn(debug.traceback(m))
+		end, "Attempt to run Path:Stop() in idle state")
+		return
+	end
+	disconnectMoveConnection(self)
+	self._status = Path.StatusType.Idle
+	self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+	self._events.Stopped:Fire(self._model)
+end
+
+function Path:Run(target)
+
+	--Non-humanoid handle case
+	if not target and not self._humanoid and self._target then
+		moveToFinished(self, true)
+		return
+	end
+
+	--Parameter check
+	if not (target and (typeof(target) == "Vector3" or target:IsA("BasePart"))) then
+		output(error, "Pathfinding target must be a valid Vector3 or BasePart.")
+	end
+
+	--Refer to Settings.TIME_VARIANCE
+	if os.clock() - self._t <= self._settings.TIME_VARIANCE and self._humanoid then
+		task.wait(os.clock() - self._t)
+		declareError(self, self.ErrorType.LimitReached)
+		return false
+	elseif self._humanoid then
+		self._t = os.clock()
+	end
+
+	--Compute path
+	local pathComputed, _ = pcall(function()
+		self._path:ComputeAsync(self._agent.PrimaryPart.Position, (typeof(target) == "Vector3" and target) or target.Position)
+	end)
+
+	--Make sure path computation is successful
+	if not pathComputed
+		or self._path.Status == Enum.PathStatus.NoPath
+		or #self._path:GetWaypoints() < 2
+		or (self._humanoid and self._humanoid:GetState() == Enum.HumanoidStateType.Freefall) then
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+		task.wait()
+		declareError(self, self.ErrorType.ComputationError)
+		return false
+	end
+
+	--Set status to active; pathfinding starts
+	self._status = (self._humanoid and Path.StatusType.Active) or Path.StatusType.Idle
+	self._target = target
+
+	--Set network owner to server to prevent "hops"
+	pcall(function()
+		self._agent.PrimaryPart:SetNetworkOwner(nil)
+	end)
+
+	--Initialize waypoints
+	self._waypoints = self._path:GetWaypoints()
+	self._currentWaypoint = 2
+
+	--Refer to Settings.COMPARISON_CHECKS
+	if self._humanoid then
+		comparePosition(self)
+	end
+
+	--Visualize waypoints
+	destroyVisualWaypoints(self._visualWaypoints)
+	self._visualWaypoints = (self.Visualize and createVisualWaypoints(self._waypoints))
+
+	--Create a new move connection if it doesn't exist already
+	self._moveConnection = self._humanoid and (self._moveConnection or self._humanoid.MoveToFinished:Connect(function(...)
+		moveToFinished(self, ...)
+	end))
+
+	--Begin pathfinding
+	if self._humanoid then
+		self._humanoid:MoveTo(self._waypoints[self._currentWaypoint].Position)
+	elseif #self._waypoints == 2 then
+		self._target = nil
+		self._visualWaypoints = destroyVisualWaypoints(self._visualWaypoints)
+		self._events.Reached:Fire(self._agent, self._waypoints[2])
+	else
+		self._currentWaypoint = getNonHumanoidWaypoint(self)
+		moveToFinished(self, true)
+	end
+	return true
+end
+
+return Path  -  Editar
+  03:13:53.586  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.586  ------------------------------------------  -  Editar
+  03:13:53.586  PATH: Workspace.Characters.Scavenger.AI.__debug  -  Editar
+  03:13:53.586  TYPE: ModuleScript  -  Editar
+  03:13:53.586  ------------------------------------------  -  Editar
+  03:13:53.586  local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
+
+local Storage = ReplicatedStorage:WaitForChild("Storage")
+
+local module = {}
+
+function module:debugLine(p1, p2, dur, color1, color2, line_color)
+	local a = Storage.Miscs.debugObjects.A:Clone()
+	local b = Storage.Miscs.debugObjects.B:Clone()
+	a.Color = color1 or a.Color
+	b.Color = color2 or b.Color
+	a.Beam.Color = line_color and ColorSequence.new(line_color) or a.Beam.Color
+	a.Beam.Attachment0 = a.Attachment
+	a.Beam.Attachment1 = b.Attachment
+	a.Position = p1
+	b.Position = p1 + p2
+	a.Parent = workspace.Ignored
+	b.Parent = workspace.Ignored
+	Debris:AddItem(a, dur or 3)
+	Debris:AddItem(b, dur or 3)
+end
+
+function module:point(p1, dur)
+	local p = Storage.Miscs.debugObjects.Point:Clone()
+	p.CFrame = CFrame.new(p1)
+	p.Parent = workspace.Ignored
+	Debris:AddItem(p, dur or 3)
+end
+
+return module  -  Editar
+  03:13:53.586  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.586  ------------------------------------------  -  Editar
+  03:13:53.586  PATH: Workspace.FloatingBuoy.OB_003_LOW.Script  -  Editar
+  03:13:53.586  TYPE: Script  -  Editar
+  03:13:53.586  ------------------------------------------  -  Editar
+  03:13:53.586  local by = script.Parent
+
+local start_cframe = by.CFrame
+
+local offset = math.noise(start_cframe.Position.X, start_cframe.Position.Y, start_cframe.Position.Z)*6
+
+local t = 0
+
+while task.wait() do
+	
+	
+	local offset_cframe = CFrame.new(math.noise( offset/8 + t )/2, math.noise( offset/8 + t )*2, math.noise( offset/8 + t )/2) * CFrame.Angles(math.noise( offset + t )/10, math.noise( offset/2 + t )/10, math.noise( offset/4 + t )/10)
+
+	script.Parent.CFrame = start_cframe * offset_cframe
+	
+	t+=0.01
+end  -  Editar
+  03:13:53.586  
+-- END OF SCRIPT --
+  -  Editar
+  03:13:53.587  !!! SCRAPE COMPLETE !!!  -  Editar

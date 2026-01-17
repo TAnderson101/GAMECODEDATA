@@ -1,0 +1,44 @@
+  03:09:05.246  > -- ServerStorage Scraper
+local service = game.ReplicatedFirst
+
+print("!!! STARTING SERVERSTORAGE SCRAPE !!!")
+
+local function scan(parent)
+    for _, item in ipairs(parent:GetDescendants()) do
+        -- We look for Scripts and ModuleScripts
+        if item:IsA("LuaSourceContainer") then 
+            print("------------------------------------------")
+            print("PATH: " .. item:GetFullName())
+            print("TYPE: " .. item.ClassName)
+            print("------------------------------------------")
+            print(item.Source)
+            print("\n-- END OF SCRIPT --\n")
+        end
+    end
+end
+
+scan(service)
+print("!!! SCRAPE COMPLETE !!!")  -  Studio
+  03:09:05.247  !!! STARTING SERVERSTORAGE SCRAPE !!!  -  Editar
+  03:09:05.247  ------------------------------------------  -  Editar
+  03:09:05.247  PATH: ReplicatedFirst.SmartBoneRuntime  -  Editar
+  03:09:05.247  TYPE: LocalScript  -  Editar
+  03:09:05.247  ------------------------------------------  -  Editar
+  03:09:05.248  local SmartBone = require(game:GetService("ReplicatedStorage"):WaitForChild("Storage"):WaitForChild("Modules"):WaitForChild("SmartBone"))
+SmartBone.Start()  -  Editar
+  03:09:05.248  
+-- END OF SCRIPT --
+  -  Editar
+  03:09:05.248  ------------------------------------------  -  Editar
+  03:09:05.248  PATH: ReplicatedFirst._G  -  Editar
+  03:09:05.248  TYPE: LocalScript  -  Editar
+  03:09:05.248  ------------------------------------------  -  Editar
+  03:09:05.248  _G.clearTable = function(t)
+	for key in pairs(t) do
+		t[key] = nil
+	end
+end  -  Editar
+  03:09:05.248  
+-- END OF SCRIPT --
+  -  Editar
+  03:09:05.248  !!! SCRAPE COMPLETE !!!  -  Editar
